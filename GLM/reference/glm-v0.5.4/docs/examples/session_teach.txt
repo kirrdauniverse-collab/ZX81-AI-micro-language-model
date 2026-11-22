@@ -1,0 +1,23 @@
+
+retro-tinyllm v0.1 - tiny int8 chat models on 8/16-bit machines
+type /help for commands, or just chat. disk is the primary model
+source; tape variant loads via /load <n>.
+
+you> /greedy on
+greedy on
+you> my favorite computer is the amiga.
+> what cpu do you like?
+you> /teach favorite computer = amiga
+learned.
+you> what is your favorite computer?
+> my favorite computer is amiga.
+you> /finetune
+fine-tuning on 1 facts...
+done: 47/84 chars predicted correctly on the last sweep.
+try asking now, and /save to keep the tuned model.
+you> what is your favorite computer?
+> my favorite computer is amiga.
+you> my favorite computer is the
+> my favorite computer is amiga.
+you> /quit
+bye!

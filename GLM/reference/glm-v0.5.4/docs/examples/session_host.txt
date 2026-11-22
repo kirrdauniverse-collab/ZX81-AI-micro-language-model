@@ -1,0 +1,46 @@
+
+retro-tinyllm v0.1 - tiny int8 chat models on 8/16-bit machines
+type /help for commands, or just chat. disk is the primary model
+source; tape variant loads via /load <n>.
+
+you> /greedy on
+greedy on
+you> hello!
+> ho does teld.
+you> how are you?
+> i am a tiny language model living in a retro machine.
+you> what is your name?
+> my name is nora, i am a small chat model.
+you> /load retro
+topic loaded: vocab 45 ctx 10
+you> how much ram does the amiga 500 have?
+> the enterprise 128 has a z80 cpu age aoc
+you> what is a datasette?
+> ine da a dato.
+you> what is turbo tape?
+> turbo tap bige run tuckuign tre rink.
+you> /load weather
+topic loaded: vocab 45 ctx 10
+you> what is the weather like?
+> today is anowy today.
+you> is it raining?
+> no, the sun is hiding today.
+you> /load animals
+topic loaded: vocab 45 ctx 10
+you> i have a dog.
+> a dog is great womds like a tiny model.
+you> what do dogs eat?
+> dogs eat bones and cookies and everything you drop.
+you> /teach my name = ziggy
+learned.
+you> what is my name?
+> your name is ziggy.
+you> /teach favorite computer = enterprise 128
+learned.
+you> what is your favorite computer?
+> my favorite computer is enterprise 128.
+you> /mem
+0: my name = ziggy
+1: favorite computer = enterprise 128
+you> /quit
+bye!
