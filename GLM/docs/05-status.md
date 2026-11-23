@@ -1,9 +1,14 @@
-# Status v0.1 (first real engine)
+# Status v0.2
 
-Built and tested on the host (gcc): tokenizer with stemming and typo tolerance, retrieval-seeded bigram generation with
-temperature, trigger|response knowledge format. Built for the ZX81 with z88dk (11.5 KB image, 5.1 KB code incl. runtime + 5.2 KB model).
-NOT yet tested on a ZX81 or emulator (no ROM here). Not yet in: boot profile, persistent memory, RAMTOP zone, inverse headers,
-clock/tokens/time, SHIFT keys, save, smileys/mood/insult mirroring, unknown-word learning, calendar, turbo tape.
-Tape: GLM/out/PICO_AI_v0.1.t81 = LOADER (BASIC) + PICO (engine). RAMTOP loader (loader.bas) is for the next version.
-Model: GLM/knowledge/base.txt -> tools/build_model.py -> engine/model.h (253 words, 75 sentences).
-Build: tools/build_model.py knowledge/base.txt engine/model.h ; zcc +zx81 -vn -O3 zx81_main.c pico.c -o pico -create-app
+v0.2: own display layer instead of the z88dk console (which ignored newlines and showed lower case as inverse).
+Screen: row 0 title | rows 1-12 chat, scrolling up from the bottom | row 13 MEMORY bar | rows 14-18 storage (hex cells of the
+last context bitmap, a first use of the screen as storage) | rows 19-20 input | row 21 inverse status (temperature, tokens in/out,
+response time, clock) | row 22 key hints | row 23 state.
+Chat headers are inverse: "YOU hh:mm:ss TOK n" and "PICO hh:mm:ss TOK n t.tS". Body text is normal (never inverse).
+Keys: SHIFT+1..4 temperature, SHIFT+0 delete, ENTER send. At start the clock is set by typing HHMM.
+Display safety: every cell is 0-63 or 128-191; row ends (0x76) are never written; the simulator (tools/screen_sim.py) checks this
+and found one real bug during development (storage row overwrote a row end).
+Memory: image 14.8 KB (code incl. runtime ~7.9 KB, model 5.2 KB, buffers), 1.6 KB free for stack.
+NOT tested on a real ZX81/emulator yet: keyboard scan, SHIFT detection, timing (FRAMES), display switch.
+Still missing: boot profile, persistent memory/RAMTOP zone, SHIFT+5/6 scroll, SHIFT+9 reasoning, SHIFT+S save, smileys/mood/insult
+mirroring, unknown-word learning, calendar, turbo tape.
