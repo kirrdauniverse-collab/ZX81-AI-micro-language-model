@@ -94,7 +94,7 @@ static void draw_status(const char *state) {
 }
 static void draw_static(void) {
     uc r;
-    fillr(0, INV); text_at(0, 0, "PICO AI - ZX81 MICRO LLM V0.2", INV);
+    fillr(0, INV); text_at(0, 0, "PICO AI - ZX81 MICRO LLM V0.3", INV);
     fillr(13, INV); text_at(13, 0, "MEMORY", INV);
     for (r = ST0; r <= 18; r++) fillr(r, 0);
     text_at(22, 0, "SHIFT+1..4 TEMP  SHIFT+0 DEL", 0);

@@ -18,10 +18,21 @@ typedef unsigned int uc;     /* sccz80 generates much smaller code for 16-bit lo
 static u16 seed = 1;
 static u8 rnd(void) { seed = seed * 25173u + 13849u; return (u8)(seed >> 8); }
 u8 temperature = 2;           /* 1..4 */
+static uc unk;                /* unknown words in the last input */
+static char unkw[17];         /* the first one */
 static u8 ctx[32];            /* bitmap of tokens seen in the user text */
 static u8 col;
 
-static const char *vword(uc id) { return vstr + voff[id - 2]; }
+static const char *vword(uc id) {                  /* words are stored one after another: scan to the id-th */
+    const char *v = vstr;
+    while (id-- > 2) v += strlen(v) + 1;
+    return v;
+}
+static const u8 *succ_of(uc tok) {                 /* successor list of a token: (next,count) pairs ended by 0 */
+    const u8 *p = bdat;
+    while (tok--) { while (*p) p += 2; p++; }
+    return p;
+}
 
 char rbuf[224];               /* reply text (lines already wrapped at 32 columns, '\n' separated) */
 static u8 rlen;
@@ -33,6 +44,17 @@ static void out_word(const char *w, uc nospace) {
     if (!nospace && col && col + 1 + l > COLS) { outc('\n'); col = 0; }
     else if (!nospace && col) { outc(' '); col++; }
     while (*w) { outc(*w++); col++; }
+}
+
+static void say(const char *s) {                 /* write a plain message word by word (wrapped) */
+    char t[17]; uc n;
+    while (*s) {
+        for (n = 0; *s && *s != ' ' && n < 16; n++) t[n] = *s++;
+        t[n] = 0;
+        while (*s == ' ') s++;
+        out_word(t, t[0] == '.' || t[0] == ',');
+        ntok_out++;
+    }
 }
 
 /* ---- tokenizer ---- */
@@ -67,19 +89,20 @@ static uc edist(const char *a, uc la, const char *b, uc lb) {   /* Levenshtein, 
 }
 static uc lookup(const char *w) {                 /* word -> token id or 0 ; exact, stem, or near match */
     char s1[16], s2[16];
-    uc l1, l2, id, best = 0, bd = 9, d, lw = (uc)strlen(w);
-    l1 = stem(w, s1);
-    for (id = 2; id < NVOC; id++) {
-        const char *v = vword(id);
+    uc l1, l2, id, best = 0, bd = 9, d, lv, lw = (uc)strlen(w);
+    const char *v;
+    for (id = 2, v = vstr; id < NVOC; id++, v += strlen(v) + 1)
         if (!strcmp(v, w)) return id;
-    }
-    for (id = 2; id < NVOC; id++) {
-        const char *v = vword(id);
-        if (v[0] < 'A' || v[0] > 'Z') continue;
+    if (lw < 3) return 0;
+    l1 = stem(w, s1);
+    for (id = 2, v = vstr; id < NVOC; id++, v += strlen(v) + 1) {
+        if (v[0] != w[0] && v[1] != w[1]) continue;       /* pre-filter: a typo rarely changes both first letters */
+        lv = (uc)strlen(v);
+        if (lv + 2 < lw || lw + 2 < lv || v[0] < 'A') continue;   /* and the length must be close */
         l2 = stem(v, s2);
         if (l1 == l2 && !strcmp(s1, s2)) return id;
         if (lw >= 4) {
-            d = edist(w, lw, v, (uc)strlen(v));
+            d = edist(w, lw, v, lv);
             if (d < bd) { bd = d; best = id; }
         }
     }
@@ -88,13 +111,15 @@ static uc lookup(const char *w) {                 /* word -> token id or 0 ; exa
 }
 static uc tokenize(const char *line) {             /* fills ctx, returns number of recognised words */
     char w[17]; uc n = 0, hits = 0, id;
-    memset(ctx, 0, sizeof ctx);
+    memset(ctx, 0, sizeof ctx); unk = 0;
     for (;; line++) {
         char c = *line;
         if (c >= 'a' && c <= 'z') c -= 32;
         if (c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') { if (n < 16) w[n++] = c; }
         else {
-            if (n) { w[n] = 0; id = lookup(w); if (id) { ctx[id >> 3] |= 1 << (id & 7); hits++; } n = 0; }
+            if (n) { w[n] = 0; id = lookup(w); if (id) { ctx[id >> 3] |= 1 << (id & 7); hits++; }
+                else if (n >= 3 && w[0] > '9') { if (!unk) strcpy(unkw, w); unk++; }
+                n = 0; }
             if (!c) break;
         }
     }
@@ -114,32 +139,48 @@ uc pico_count(const char *s) {
 
 /* ---- generation ---- */
 void pico_reply(const char *line, u16 sd) {
-    uc hits, i, bi = 0, cur, pos, n, nsucc, pick, divg;
+    uc i, bi = 0, cur, pos, n, nsucc, pick, divg;
     u16 bs = 0, sc, p, tot, r, follow, S;
-    static const u8 kfol[5] = {0, 100, 30, 8, 2};   /* follow weight = successor total * k */
+    uc cm, sm, bcm = 0, bsm = 0, ln, mk, t;
+    u8 seen[32];
+    static const u8 kfol[5] = {0, 100, 60, 12, 3};   /* follow weight = successor total * k */
     if (sd) seed = sd;
-    rlen = 0; rbuf[0] = 0; ntok_out = 0;
-    hits = tokenize(line);
+    ntok_out = 0;
+    tokenize(line);
     /* 1. retrieval: choose the sentence that matches the input best */
     for (i = 0; i < NSENT; i++) {
-        sc = 0;
-        for (p = sidx[i]; sent[p]; p++) if (sent[p] != 255 && INCTX(sent[p])) sc += vw[sent[p]];
-        { uc ln = 0; for (p = sidx[i]; sent[p]; p++) ln++; sc = sc * 8 + 40 - (ln > 40 ? 40 : ln) + (rnd() & (temperature * 3 - 1)); }   /* shorter wins ties; temperature adds jitter */
-        if (hits == 0 && i >= 16) sc = (rnd() & 63) + 8;   /* general line */    /* nothing recognised: pick a general line */
-        if (sc >= bs) { bs = sc; bi = i; }
+        sc = 0; cm = 0; sm = 0; ln = 0; mk = 0; memset(seen, 0, 32);
+        for (p = sidx[i]; sent[p]; p++) { ln++; if (sent[p] == 255) mk = ln; }
+        ln = 0;
+        for (p = sidx[i]; sent[p]; p++) {
+            ln++;
+            t = sent[p];
+            if (t != 255 && INCTX(t) && !(seen[t >> 3] & (1 << (t & 7)))) {      /* each matched word counts once per sentence */
+                seen[t >> 3] |= 1 << (t & 7);
+                if (vw[t]) { sc += vw[t]; cm++; } else sm += (ln < mk) ? 4 : 1;     /* small words in the trigger part count much more */
+            }
+        }
+        sc = sc * 8 + (sm > 16 ? 16 : sm) * 4 + 40 - (ln > 40 ? 40 : ln) + (rnd() & (temperature * 3 - 1));   /* shorter wins ties; temperature adds jitter */
+        if (sc >= bs) { bs = sc; bi = i; bcm = cm; bsm = sm; }
     }
+    /* nothing sensible found: say so instead of guessing */
+    rlen = 0; rbuf[0] = 0; col = 0;
+    if (unk && bcm <= 1) {
+        say("SORRY , I DO NOT KNOW THE WORD"); say(unkw); say(". TRY OTHER WORDS ."); return;
+    }
+    if (bcm == 0 && bsm < 3) { say("SORRY , I HAVE NO DATA ABOUT THAT . ASK ME SOMETHING ELSE ."); return; }
     /* 2. generate from the first word of that sentence, walking the bigram table */
     p = sidx[bi];
     for (r = p; sent[r]; r++) if (sent[r] == 255) { p = r + 1; break; }
     pos = 1; cur = sent[p]; divg = 0; n = 0; col = 0;
     out_word(vword(cur), 1); ntok_out++;
     while (n++ < MAXT) {
-        u16 b = boff[cur];
+        const u8 *bp = succ_of(cur);
         tot = 0; S = 0;
-        for (nsucc = 0; bdat[b + 2 * nsucc]; nsucc++) S += bdat[b + 2 * nsucc + 1];
+        for (nsucc = 0; bp[2 * nsucc]; nsucc++) S += bp[2 * nsucc + 1];
         follow = S * kfol[temperature];
-        for (nsucc = 0; bdat[b + 2 * nsucc]; nsucc++) {
-            uc t = bdat[b + 2 * nsucc], c = bdat[b + 2 * nsucc + 1];
+        for (nsucc = 0; bp[2 * nsucc]; nsucc++) {
+            uc t = bp[2 * nsucc], c = bp[2 * nsucc + 1];
             u16 wgt = c;
             if (!divg && sent[p + pos] == t) wgt += follow;
             if (t != END_ID && INCTX(t) && vw[t]) wgt += 3;
@@ -149,7 +190,7 @@ void pico_reply(const char *line, u16 sd) {
         r = (u16)((rnd() << 8 | rnd()) % tot);
         pick = 0;
         for (i = 0; i < nsucc; i++) {
-            uc t = bdat[b + 2 * i], c = bdat[b + 2 * i + 1];
+            uc t = bp[2 * i], c = bp[2 * i + 1];
             u16 wgt = c;
             if (!divg && sent[p + pos] == t) wgt += follow;
             if (t != END_ID && INCTX(t) && vw[t]) wgt += 3;
