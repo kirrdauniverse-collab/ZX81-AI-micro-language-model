@@ -98,11 +98,8 @@ jobs:
           p = Path("tools/t81build16.py")
           s = p.read_text()
           s = s.replace("    s[31] = 0                   # $4028", "    s[31] = 55                  # $4028 MARGIN: 55 PAL scanlines")
-          if "    s[50] = 0x40" not in s:
-              s = s.replace("    s[32:34] = le16(DFILE)", "    s[50] = 0x40                # $403B CDFLAG: request display\n    s[32:34] = le16(DFILE)")
-          # Ensure BASIC enables SLOW display before calling the machine-code boot.
-          s = s.replace('l2 = (b"\\xFA\\xD4" +', 'l2 = (b"\\xE4\\x0E" + b"\\xFA\\xD4" +')
-          s = s.replace("assert len(l2) == 33", "assert len(l2) == 35")
+          # Leave CDFLAG at zero and the BASIC editor in FAST mode.
+          # The boot/app code will explicitly enter SLOW after setting IY.
           p.write_text(s)
           # The boot returns a BASIC USR result; declare the correct C return type.
           p = Path("ports/zx81/boot16.c")
