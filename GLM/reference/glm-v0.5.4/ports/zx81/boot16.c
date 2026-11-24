@@ -75,9 +75,17 @@ static void getline(char *buf, int max)
         int c = hal_getchar();
         if (c == -1)
             continue;
-        if (c == '\n') {
+        if (c == '\n' || c == '\r') {
             buf[n] = 0;
             return;
+        }
+        if (c == 8 || c == 127) {
+            if (n > 0) {
+                n--;
+                buf[n] = 0;
+                hal_putchar(8);
+            }
+            continue;
         }
         if (c < ' ' || c > 0x7F)
             continue;                 /* shifted keys, graphics */
