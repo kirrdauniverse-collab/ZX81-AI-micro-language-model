@@ -112,7 +112,7 @@ jobs:
           needle = 'if int.from_bytes(image[7:9],"little")!=b.VARS: raise SystemExit(f"{name}: VARS mismatch")'
           v = v.replace(
               needle,
-              needle + '\\n        if int.from_bytes(image[32:34],"little")!=b.PROG: raise SystemExit(f"{name}: NTLIN mismatch")')
+              needle + '\n        if int.from_bytes(image[32:34],"little")!=b.PROG: raise SystemExit(f"{name}: NTLIN mismatch")')
           if "RAMTOP mismatch" in v or "LAST_K/DEBOUNCE initial state mismatch" not in v or "NTLIN mismatch" not in v:
               raise SystemExit("system-variable verifier correction did not apply")
           p.write_text(v)
