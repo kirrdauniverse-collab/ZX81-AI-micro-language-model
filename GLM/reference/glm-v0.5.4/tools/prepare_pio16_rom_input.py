@@ -62,7 +62,20 @@ hal = hal.replace("case 11: return 0x1F;  /* SHIFT+7: scroll/page down */",
                   "case 11: return 0x1F;  /* SHIFT+7: scroll/page down */")
 hal = hal.replace("case 6:  return 0x06;  /* SHIFT+9: reasoning toggle */",
                   "case 10: return 0x06; /* SHIFT+9: reasoning toggle */")
+# The 24-row D-FILE leaves rows 22-23 to the ROM lower screen;
+# the application text console can therefore use rows 8..21.
+hal = hal.replace("#define ZX81_TEXT_BOT 15", "#define ZX81_TEXT_BOT 21")
 write("ports/zx81/hal_zx81.c", hal)
+
+# Keep the documented shortcuts aligned with Z88DK's actual shifted-key codes.
+app = read("ports/zx81/app16.c")
+app = app.replace("#define K_PAGEUP   0x1E    /* SHIFT+5 */",
+                  "#define K_PAGEUP   0x1E    /* SHIFT+6 */")
+app = app.replace("#define K_PAGEDOWN 0x1F    /* SHIFT+0 */",
+                  "#define K_PAGEDOWN 0x1F    /* SHIFT+7 */")
+app = app.replace("#define K_RUBOUT   8       /* SHIFT+5: ZX81 RUBOUT (ASCII backspace) */",
+                  "#define K_RUBOUT   8       /* SHIFT+5: ZX81 RUBOUT (ASCII backspace) */")
+write("ports/zx81/app16.c", app)
 
 # The BASIC INPUT editor stores the user's name in a string variable.
 # Ignore the ZX81's inverse-video bit when translating the stored text.
