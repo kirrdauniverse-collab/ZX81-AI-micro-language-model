@@ -628,6 +628,12 @@ int main(void)
 
     rt_charset_init();
 
+    /* Initialize the chat engine before restoring the saved profile.
+     * v0.5.4 had omitted this call, leaving max_new=0 in the zeroed
+     * static structure, so generation could silently do no work. */
+    rt_chat_init(&chat, hal_entropy() ^ 0xA51F39D7UL);
+    chat.max_new = 48;       /* bounded reply length for the 16K ZX81 */
+
     /* the /save handoff: the line-3 USR must return 2 (and clear).
      * The tail is written-only in v0.5: the work rows survive every
      * block load (they sit above all image ends), so on a normal boot
