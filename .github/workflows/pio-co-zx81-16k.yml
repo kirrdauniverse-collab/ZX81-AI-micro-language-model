@@ -1,4 +1,4 @@
-name: PIOCO ZX81 16K Z88DK build
+name: PIOCO ZX81 16K Z88DK build (24-row D-FILE)
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Checkout isolated build branch
         uses: actions/checkout@v4
-      - name: Apply English QAT and 18-row RAMTOP source fixes
+      - name: Apply English QAT and full 24-row ZX81 system layout
         working-directory: GLM/reference/glm-v0.5.4
         run: |
           set -euxo pipefail
@@ -66,14 +66,14 @@ jobs:
           s = s.replace('s[32:34] = le16(DFILE)      # $4029 = D_FILE copy', 's[32:34] = le16(PROG)       # $4029 NTLIN = first BASIC line')
           old = '    s = bytearray(116)'
           new = '''    template_path = os.environ.get("RT16_SYSVARS_TEMPLATE")
-          if template_path:
-              from pathlib import Path
-              template_data = Path(template_path).read_bytes()
-              if len(template_data) < 116:
-                  raise ValueError("Z88DK .P system-variable template is shorter than 116 bytes")
-              s = bytearray(template_data[:116])
-          else:
-              s = bytearray(116)'''
+              if template_path:
+                  from pathlib import Path
+                  template_data = Path(template_path).read_bytes()
+                  if len(template_data) < 116:
+                      raise ValueError("Z88DK .P system-variable template is shorter than 116 bytes")
+                  s = bytearray(template_data[:116])
+              else:
+                  s = bytearray(116)'''
           if old not in s: raise SystemExit("sysvars template insertion point not found")
           s = s.replace(old, new, 1)
           s = s.replace('return b"\\x76" + (b"\\x00" * 32 + b"\\x76") * 24',
