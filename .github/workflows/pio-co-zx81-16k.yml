@@ -24,15 +24,11 @@ jobs:
           # App: use the model's actual RTLM size and append the English intent tag.
           p = Path("ports/zx81/app16.c")
           s = p.read_text()
-          s = s.replace('#define MSIZE 1030              /* the class-G blob: fixed layout */', '')
+          s = s.replace('#define MSIZE 1030              /* the class-G blob: fixed layout */', '#define MSIZE 1038              /* English8 QAT G2 blob */')
           s = s.replace('#include "rt_engine.h"\n', '#include "rt_engine.h"\n#include "intent16.h"\n')
-          s = s.replace('static rt_u16 model_addr;      /* where the magic scan found the blob */\n#define TAG_AT     (model_addr + MSIZE)\n#define NAMTAB_AT  (model_addr + MSIZE + 12)',
-                        'static rt_u16 model_addr;      /* where the magic scan found the blob */\nstatic rt_u16 model_size;      /* parsed from the RTLM header */\n#define TAG_AT     (model_addr + model_size)\n#define NAMTAB_AT  (model_addr + model_size + 12)')
-          s = s.replace('model_addr = a;\n                namtab = a + MSIZE + 12;',
-                        'model_addr = a;\n                model_size = (rt_u16)rt_model_size(&model.hdr);\n                namtab = a + model_size + 12;')
           s = s.replace('rt_chat_push(&chat, line);\n        gen_reply();',
                         'rt_chat_push(&chat, line);\n        rt_chat_push(&chat, rt16_reply_tag(line));\n        rt_chat_push_idx(&chat, 0);\n        gen_reply();')
-          if 'rt16_reply_tag(line)' not in s or 'model_size = (rt_u16)rt_model_size' not in s:
+          if 'rt16_reply_tag(line)' not in s or '#define MSIZE 1038' not in s:
               raise SystemExit("app16 English model/tag patch did not apply cleanly")
           p.write_text(s)
           # HAL: with 18 display rows, rows 8..15 are the chat console.
@@ -101,7 +97,7 @@ jobs:
           base64 -d build/zx81/english8_qat_g2.bin.b64 > models16_v05_en/english8_qat_g2.bin
           DEFS="-DZX81_RAMTOP_LAYOUT -DRT_MAX_VOCAB=48 -DRT_MAX_CTX=8 -DRT_MAX_EMB=4 -DRT_MAX_HID=8 -DRT_APP_MODEL_MAX=1100 -DRT_MEM_MAX=6 -DRT_JOURNAL_MAX=8 -DRT_LINE_MAX=64"
           docker pull z88dk/z88dk:latest
-          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -compiler=80cc -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
+          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 --opt-code-speed=none -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
           docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rboot16 ports/zx81/hal_zx81.c ports/zx81/boot16.c
           python3 tools/extract_zx81_rem.py build/zx81/rtchat16.P build/zx81/rtchat16.bin
           python3 tools/extract_zx81_rem.py build/zx81/rboot16.P build/zx81/rboot16.bin
