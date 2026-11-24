@@ -121,7 +121,8 @@ jobs:
           # Make the BOOT BASIC program use the ROM's own INPUT statement.
           p = Path("tools/t81build16.py")
           s = p.read_text()
-          helper = r'''
+          import textwrap
+          helper = textwrap.dedent(r'''
           def zx_text_codes(text):
               out = bytearray()
               for ch in text:
@@ -214,7 +215,7 @@ jobs:
               load_line = usrlines("RTBASE16", False)[0]
               lines.append(be16(17) + load_line[2:])
               return lines
-          '''
+          ''')
           marker = '\ndef build_boot(code):'
           if marker not in s:
               raise SystemExit("build_boot insertion point not found")
