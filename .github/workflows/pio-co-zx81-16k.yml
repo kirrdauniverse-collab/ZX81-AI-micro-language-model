@@ -64,7 +64,7 @@ jobs:
           ELINE = VARS + 1'''
           if old not in s: raise SystemExit("builder constants not found")
           s = s.replace(old, new)
-          s = s.replace('s[29:31] = le16(0x7FFD)', 's[29:31] = le16(RAMTOP_ADDR)')
+          s = s.replace('s[29:31] = le16(0x7FFD)', 's[29:31] = b"\\x00\\x00"  # $4026 LAST_K high byte; $4027 DEBOUNCE')
           s = s.replace('return b"\\x76" + (b"\\x00" * 32 + b"\\x76") * 24',
                         'return b"\\x76" + (b"\\x00" * 32 + b"\\x76") * DFILE_LINES')
           marker = '\ndef build_image(code, model, tag_idx, tag_name, load_name, with_save):'
@@ -94,6 +94,22 @@ jobs:
           s = s.replace('assert Z + len(img) < DFILE - 793, "boot chain too big"',
                         'assert Z + len(img) < DFILE - DFILE_SIZE, "boot chain too big"')
           p.write_text(s)
+          # Correct the verifier too: RAMTOP is at $4004-$4005, outside a
+          # .P image that starts at $4009. Offsets 28..30 are LAST_K/DEBOUNCE.
+          p = Path("tools/verify_ramtop_tape.py")
+          v = p.read_text()
+          v = v.replace(
+              'if b.DFILE_LINES!=18 or b.DFILE!=0x7B00 or b.RAMTOP_ADDR!=0x7F80:',
+              'if b.DFILE_LINES!=18 or b.DFILE!=0x7B00:')
+          v = v.replace(
+              'if int.from_bytes(image[29:31],"little")!=b.RAMTOP_ADDR: raise SystemExit(f"{name}: RAMTOP mismatch")',
+              'if image[28:31] != b"\\x00\\x00\\x00": raise SystemExit(f"{name}: LAST_K/DEBOUNCE clobbered")')
+          v = v.replace(
+              'print(f"PASS: 15 EO81 blocks; D_FILE=${b.DFILE:04X}; VARS=${b.VARS:04X}; RAMTOP=${b.RAMTOP_ADDR:04X}")',
+              'print(f"PASS: 15 EO81 blocks; D_FILE=${b.DFILE:04X}; VARS=${b.VARS:04X}; LAST_K=0000; DEBOUNCE=00")')
+          if "RAMTOP mismatch" in v or "LAST_K/DEBOUNCE clobbered" not in v:
+              raise SystemExit("RAMTOP verifier correction did not apply")
+          p.write_text(v)
           # Initialize the real ZX81 PAL video state in the generated system variables.
           p = Path("tools/t81build16.py")
           s = p.read_text()
