@@ -19,7 +19,6 @@
  * runs. No printf anywhere: the text layer writes glyphs straight into
  * the D-file, so the ROM's scroll can never touch our rows 0-7.
  */
-#include <stdio.h>   /* getk() lives here in z88dk 1.8 (not in zx81.h!) */
 #include <zx81.h>
 #include <input.h>
 #include "rt_hal.h"
@@ -31,22 +30,6 @@
  * output table below (the v0.3 input switch had drifted from it:
  * e.g. key 0x05 rendered as '?' but decoded as '('). ZX81 letters are
  * uppercase glyphs; the chat folds them to lowercase. */
-static const signed char ZX81_TO_ASCII[64] = {
-    /* v0.5: the exact inverse of the corrected ASCII_TO_ZX81 table
-     * below - every code from the ROM K-UNSHIFT/K-SHIFT tables
-     * ($007E/$00A5). The v0.3-era table had drifted badly: no comma,
-     * no slash, no period, '$' sat at 0x10. Keys 0x01-0x0A are the
-     * graphics codes (no ASCII), 0x0C is the pound glyph. */
-    /* 0x00 */ ' ',  -1,   -1,   -1,   -1,   -1,   -1,   -1,
-    /* 0x08 */ -1,   -1,   -1,   '"',  -1,   '$',  ':',  '?',
-    /* 0x10 */ '(',  ')',  '>',  '<',  '=',  '+',  '-',  '*',
-    /* 0x18 */ '/',  ';',  ',',  '.',  '0', '1', '2', '3',
-    /* 0x20 */ '4', '5', '6', '7', '8', '9', 'a', 'b',
-    /* 0x28 */ 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
-    /* 0x30 */ 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
-    /* 0x38 */ 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-};
-
 static const rt_u8 ASCII_TO_ZX81[96] = {
     /* v0.4.5: the punctuation codes were systematically wrong ('-'
      * printed as the pound-sign glyph $0C - the "strange B" the user
@@ -68,31 +51,6 @@ static const rt_u8 ASCII_TO_ZX81[96] = {
     /* 0x70 'p' */ 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C,
     /* 0x78 'x' */ 0x3D, 0x3E, 0x3F, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
-
-static int zx81_ascii(int k)
-{
-    if (k == 0x76)
-        return '\n'; /* NEWLINE key */
-    /* v0.5: the shifted command keys fold to app-level codes so the
-     * REPL can implement the temperature/reasoning/scroll keys:
-     * SHIFT+1..4 -> 0x11..0x14, SHIFT+5/0 (arrows) -> 0x1E/0x1F,
-     * SHIFT+2 (RUBOUT) -> 0x12 = backspace-marker for the app. */
-    if (k == 0x70)
-        return 0x1E;
-    if (k == 0x71)
-        return 0x1F;
-    if (k == 0x73)
-        return 0x14;
-    if (k == 0x74)
-        return 0x13;
-    if (k == 0x75)
-        return 0x11;
-    if (k == 0x77)
-        return 0x12;
-    if (k < 0 || k > 63)
-        return -1;
-    return ZX81_TO_ASCII[k];
-}
 
 /* The Z88DK ZX81 INKEY scanner returns one ASCII key only and
  * rejects multiple simultaneous keys. Waiting for release after each
