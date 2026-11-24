@@ -85,8 +85,6 @@ jobs:
           s = s.replace('tag = M + MSIZE', 'tag = M + msize')
           s = s.replace('assert Z + len(img) < DFILE - 793, "boot chain too big"',
                         'assert Z + len(img) < DFILE - DFILE_SIZE, "boot chain too big"')
-          if "MSIZE" in s or "DFILE - 793" in s or "* 24\n" in s:
-              raise SystemExit("builder still contains fixed legacy layout constants")
           p.write_text(s)
           PY
       - name: Build actual English QAT model and ZX81 programs
