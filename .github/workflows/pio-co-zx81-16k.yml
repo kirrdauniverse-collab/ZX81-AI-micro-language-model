@@ -36,11 +36,10 @@ jobs:
           for name in ("boot16.c", "app16.c"):
               p = Path("ports/zx81") / name
               t = p.read_text()
-              old = "    ; -IXIY swap: assembles as LD IY,4000h = the ROM sysvar base\\n    ld ix, $4000\\n    call $0F2B"
-              new = "    ; Force IY=$4000: ZX81 ROM system-variable base\\n    defb $FD,$21,$00,$40\\n    call $0F2B"
-              if old not in t:
-                  raise SystemExit(f"{name}: SLOW entry sequence not found")
-              p.write_text(t.replace(old, new))
+              if "    ld ix, $4000" not in t:
+                  raise SystemExit(f"{name}: SLOW entry instruction not found")
+              t = t.replace("    ld ix, $4000", "    defb $FD,$21,$00,$40")
+              p.write_text(t)
           # HAL: with 18 display rows, rows 8..15 are the chat console.
           p = Path("ports/zx81/hal_zx81.c")
           s = p.read_text()
