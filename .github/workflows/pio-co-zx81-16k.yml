@@ -30,8 +30,8 @@ jobs:
                         'static rt_u16 model_addr;      /* where the magic scan found the blob */\nstatic rt_u16 model_size;      /* parsed from the RTLM header */\n#define TAG_AT     (model_addr + model_size)\n#define NAMTAB_AT  (model_addr + model_size + 12)')
           s = s.replace('model_addr = a;\n                namtab = a + MSIZE + 12;',
                         'model_addr = a;\n                model_size = (rt_u16)rt_model_size(&model.hdr);\n                namtab = a + model_size + 12;')
-          s = s.replace('rt_chat_push(&chat, line);\n        rt_chat_push_idx(&chat, 0);',
-                        'rt_chat_push(&chat, line);\n        rt_chat_push(&chat, rt16_reply_tag(line));\n        rt_chat_push_idx(&chat, 0);')
+          s = s.replace('rt_chat_push(&chat, line);\n        gen_reply();',
+                        'rt_chat_push(&chat, line);\n        rt_chat_push(&chat, rt16_reply_tag(line));\n        rt_chat_push_idx(&chat, 0);\n        gen_reply();')
           if 'rt16_reply_tag(line)' not in s or 'model_size = (rt_u16)rt_model_size' not in s:
               raise SystemExit("app16 English model/tag patch did not apply cleanly")
           p.write_text(s)
