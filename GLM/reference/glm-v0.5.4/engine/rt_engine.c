@@ -22,18 +22,24 @@ static void matmul_hid(const rt_i8 *w, const rt_u8 *sh, const rt_i8 *x,
                        int n_in, int n_out, rt_i8 *y)
 {
     int o, i;
+    const rt_i8 *wr = w;
     for (o = 0; o < n_out; o++) {
-        const rt_i8 *wr = w + (long)o * (n_in + 1);
         rt_i32 acc = 0;
-        for (i = 0; i < n_in; i++)
-            acc += (rt_i32)x[i] * (rt_i32)wr[i];
-        acc += (rt_i32)128 * wr[n_in]; /* bias lane: Q7 one */
+        for (i = 0; i < n_in; i++) {
+            /* Signed 8x8 products fit in 16 bits (-16384..16129).
+             * Keep only the accumulator 32-bit; this avoids the Z80's
+             * much slower 32-bit software multiply on every MAC. */
+            rt_i16 product = (rt_i16)x[i] * (rt_i16)wr[i];
+            acc += (rt_i32)product;
+        }
+        acc += (rt_i32)((rt_i16)128 * (rt_i16)wr[n_in]);
         acc >>= sh[o];
         if (acc < 0)
-            acc = 0;    /* ReLU */
+            acc = 0;
         if (acc > 127)
-            acc = 127;  /* saturate to int8 */
+            acc = 127;
         y[o] = (rt_i8)acc;
+        wr += n_in + 1;
     }
 }
 
@@ -41,13 +47,16 @@ static void matmul_logits(const rt_i8 *w, const rt_u8 *sh, const rt_i8 *x,
                           int n_in, int n_out, rt_i32 *lg)
 {
     int o, i;
+    const rt_i8 *wr = w;
     for (o = 0; o < n_out; o++) {
-        const rt_i8 *wr = w + (long)o * (n_in + 1);
         rt_i32 acc = 0;
-        for (i = 0; i < n_in; i++)
-            acc += (rt_i32)x[i] * (rt_i32)wr[i];
-        acc += (rt_i32)128 * wr[n_in];
+        for (i = 0; i < n_in; i++) {
+            rt_i16 product = (rt_i16)x[i] * (rt_i16)wr[i];
+            acc += (rt_i32)product;
+        }
+        acc += (rt_i32)((rt_i16)128 * (rt_i16)wr[n_in]);
         lg[o] = acc >> sh[o];
+        wr += n_in + 1;
     }
 }
 
@@ -57,7 +66,7 @@ void rt_forward(const rt_model *m, const rt_u8 *ctx, rt_i32 *logits)
     int n_in = (int)m->hdr.ctx * (int)m->hdr.emb;
 
     for (i = 0; i < (int)m->hdr.ctx; i++) {
-        const rt_i8 *e = m->emb + (long)ctx[i] * m->hdr.emb;
+        const rt_i8 *e = m->emb + (int)ctx[i] * (int)m->hdr.emb;
         for (j = 0; j < (int)m->hdr.emb; j++)
             rt_x[i * (int)m->hdr.emb + j] = e[j];
     }
@@ -96,8 +105,8 @@ int rt_sample(const rt_model *m, const rt_i32 *lg, int temp_sh, int greedy,
 {
     int i, best = 0;
     rt_i32 mx = lg[0];
-    rt_u16 w[RT_MAX_VOCAB];
-    rt_u32 sum = 0, r, acc = 0;
+    rt_u8 w[RT_MAX_VOCAB];
+    rt_u16 sum = 0, r, acc = 0;
 
     for (i = 1; i < (int)m->hdr.vocab; i++)
         if (lg[i] > mx) {
@@ -118,7 +127,7 @@ int rt_sample(const rt_model *m, const rt_i32 *lg, int temp_sh, int greedy,
     if (sum == 0)
         return best;
 
-    r = rt_rand(seed) % sum;
+    r = (rt_u16)(rt_rand(seed) >> 16) % sum;
     for (i = 0; i < (int)m->hdr.vocab; i++) {
         acc += w[i];
         if (r < acc)
