@@ -83,6 +83,7 @@ jobs:
           s = s.replace('    assert M <= DFILE - 17 - 116 - 12 - MSIZE, \\',
                         '    msize = model_blob_size(model)\n    assert M <= DFILE - 17 - 116 - 12 - msize, \\')
           s = s.replace('tag = M + MSIZE', 'tag = M + msize')
+          s = s.replace('assert len(model) == MSIZE, f"${model_file}: {len(model)} != {MSIZE}"', 'assert len(model) == model_blob_size(model), "invalid RTLM blob size"')
           s = s.replace('assert Z + len(img) < DFILE - 793, "boot chain too big"',
                         'assert Z + len(img) < DFILE - DFILE_SIZE, "boot chain too big"')
           p.write_text(s)
