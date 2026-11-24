@@ -28,9 +28,9 @@ static const char *vword(uc id) {                  /* words are stored one after
     while (id-- > 2) v += strlen(v) + 1;
     return v;
 }
-static const u8 *succ_of(uc tok) {                 /* successor list of a token: (next,count) pairs ended by 0 */
+static const u8 *succ_of(uc tok) {                 /* successor list of a token: ids ended by 0 */
     const u8 *p = bdat;
-    while (tok--) { while (*p) p += 2; p++; }
+    while (tok--) { while (*p) p++; p++; }
     return p;
 }
 
@@ -138,21 +138,29 @@ uc pico_count(const char *s) {
 }
 
 /* ---- generation ---- */
+static u16 swgt(uc t, u16 nextpos, u16 follow, uc divg) {   /* weight of one successor: 1 + path bonus + context bonus */
+    u16 w = 1;
+    uc tg = sent[nextpos];
+    if (!tg) tg = END_ID;                                 /* the end of the chosen sentence is the END token */
+    if (!divg && tg == t) w += follow;
+    if (t != END_ID && INCTX(t) && vw[t]) w += 3;
+    return w;
+}
 void pico_reply(const char *line, u16 sd) {
-    uc i, bi = 0, cur, pos, n, nsucc, pick, divg;
-    u16 bs = 0, sc, p, tot, r, follow, S;
+    uc i, cur, pos, n, nsucc, pick, divg;
+    u16 bs = 0, sc, p, tot, r, follow, st, bstart = 0;
     uc cm, sm, bcm = 0, bsm = 0, ln, mk, t;
     u8 seen[32];
-    static const u8 kfol[5] = {0, 100, 60, 12, 3};   /* follow weight = successor total * k */
+    static const u8 kfol[5] = {0, 255, 120, 20, 4};   /* follow weight = successor total * k */
     if (sd) seed = sd;
     ntok_out = 0;
     tokenize(line);
     /* 1. retrieval: choose the sentence that matches the input best */
-    for (i = 0; i < NSENT; i++) {
+    for (i = 0, st = 0; i < NSENT; i++) {
         sc = 0; cm = 0; sm = 0; ln = 0; mk = 0; memset(seen, 0, 32);
-        for (p = sidx[i]; sent[p]; p++) { ln++; if (sent[p] == 255) mk = ln; }
+        for (p = st; sent[p]; p++) { ln++; if (sent[p] == 255) mk = ln; }
         ln = 0;
-        for (p = sidx[i]; sent[p]; p++) {
+        for (p = st; sent[p]; p++) {
             ln++;
             t = sent[p];
             if (t != 255 && INCTX(t) && !(seen[t >> 3] & (1 << (t & 7)))) {      /* each matched word counts once per sentence */
@@ -161,7 +169,8 @@ void pico_reply(const char *line, u16 sd) {
             }
         }
         sc = sc * 8 + (sm > 16 ? 16 : sm) * 4 + 40 - (ln > 40 ? 40 : ln) + (rnd() & (temperature * 3 - 1));   /* shorter wins ties; temperature adds jitter */
-        if (sc >= bs) { bs = sc; bi = i; bcm = cm; bsm = sm; }
+        if (sc >= bs) { bs = sc; bstart = st; bcm = cm; bsm = sm; }
+        st = p + 1;
     }
     /* nothing sensible found: say so instead of guessing */
     rlen = 0; rbuf[0] = 0; col = 0;
@@ -170,32 +179,22 @@ void pico_reply(const char *line, u16 sd) {
     }
     if (bcm == 0 && bsm < 3) { say("SORRY , I HAVE NO DATA ABOUT THAT . ASK ME SOMETHING ELSE ."); return; }
     /* 2. generate from the first word of that sentence, walking the bigram table */
-    p = sidx[bi];
+    p = bstart;
     for (r = p; sent[r]; r++) if (sent[r] == 255) { p = r + 1; break; }
     pos = 1; cur = sent[p]; divg = 0; n = 0; col = 0;
     out_word(vword(cur), 1); ntok_out++;
     while (n++ < MAXT) {
         const u8 *bp = succ_of(cur);
-        tot = 0; S = 0;
-        for (nsucc = 0; bp[2 * nsucc]; nsucc++) S += bp[2 * nsucc + 1];
-        follow = S * kfol[temperature];
-        for (nsucc = 0; bp[2 * nsucc]; nsucc++) {
-            uc t = bp[2 * nsucc], c = bp[2 * nsucc + 1];
-            u16 wgt = c;
-            if (!divg && sent[p + pos] == t) wgt += follow;
-            if (t != END_ID && INCTX(t) && vw[t]) wgt += 3;
-            tot += wgt;
-        }
+        for (nsucc = 0; bp[nsucc]; nsucc++) ;
         if (!nsucc) break;
+        follow = nsucc * kfol[temperature];
+        for (tot = 0, i = 0; i < nsucc; i++) tot += swgt(bp[i], p + pos, follow, divg);
         r = (u16)((rnd() << 8 | rnd()) % tot);
         pick = 0;
         for (i = 0; i < nsucc; i++) {
-            uc t = bp[2 * i], c = bp[2 * i + 1];
-            u16 wgt = c;
-            if (!divg && sent[p + pos] == t) wgt += follow;
-            if (t != END_ID && INCTX(t) && vw[t]) wgt += 3;
-            if (r < wgt) { pick = t; break; }
-            r -= wgt;
+            uc w = swgt(bp[i], p + pos, follow, divg);
+            if (r < w) { pick = bp[i]; break; }
+            r -= w;
         }
         if (pick == END_ID || !pick) break;
         if (!divg) { if (sent[p + pos] == pick) pos++; else divg = 1; }
