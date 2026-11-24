@@ -83,6 +83,7 @@ boot = read("ports/zx81/boot16.c")
 if "read_profile_from_rom_input" not in boot:
     raise SystemExit("boot16.c is not the ROM-INPUT profile reader")
 boot = boot.replace("        rt_u8 c = p[i];\n", "        rt_u8 c = (rt_u8)(p[i] & 0x7F);\n")
+boot = boot.replace("void main(void)", "int main(void)", 1)
 write("ports/zx81/boot16.c", boot)
 
 # Full 24-row screen file and correct system variables.
