@@ -53,12 +53,10 @@ jobs:
           s = p.read_text()
           old = 'VARS = DFILE + 793\nELINE = VARS + 1\nMSIZE = 1030'
           new = '''LAYOUT = os.environ.get("RT16_LAYOUT", "legacy").lower()
-          if LAYOUT == "legacy":
-              DFILE_LINES, RAMTOP_ADDR = 24, 0x7FFD
-          elif LAYOUT == "ramtop":
-              DFILE_LINES, RAMTOP_ADDR = 18, 0x7F80
-          else:
+          if LAYOUT not in ("legacy", "ramtop"):
               raise ValueError("RT16_LAYOUT must be legacy or ramtop")
+          # The ZX81 ROM display engine consumes 24 rows every frame.
+          DFILE_LINES = 24
           DFILE_SIZE = 1 + DFILE_LINES * 33
           VARS = DFILE + DFILE_SIZE
           ELINE = VARS + 1'''
@@ -66,6 +64,18 @@ jobs:
           s = s.replace(old, new)
           s = s.replace('s[29:31] = le16(0x7FFD)', 's[28:31] = bytes((0xBF, 0xFD, 0xFF))  # $4025 LAST_K, $4027 DEBOUNCE')
           s = s.replace('s[32:34] = le16(DFILE)      # $4029 = D_FILE copy', 's[32:34] = le16(PROG)       # $4029 NTLIN = first BASIC line')
+          old = '    s = bytearray(116)'
+          new = '''    template_path = os.environ.get("RT16_SYSVARS_TEMPLATE")
+          if template_path:
+              from pathlib import Path
+              template_data = Path(template_path).read_bytes()
+              if len(template_data) < 116:
+                  raise ValueError("Z88DK .P system-variable template is shorter than 116 bytes")
+              s = bytearray(template_data[:116])
+          else:
+              s = bytearray(116)'''
+          if old not in s: raise SystemExit("sysvars template insertion point not found")
+          s = s.replace(old, new, 1)
           s = s.replace('return b"\\x76" + (b"\\x00" * 32 + b"\\x76") * 24',
                         'return b"\\x76" + (b"\\x00" * 32 + b"\\x76") * DFILE_LINES')
           marker = '\ndef build_image(code, model, tag_idx, tag_name, load_name, with_save):'
@@ -119,7 +129,8 @@ jobs:
           # Initialize the real ZX81 PAL video state in the generated system variables.
           p = Path("tools/t81build16.py")
           s = p.read_text()
-          s = s.replace("    s[31] = 0                   # $4028", "    s[31] = 55                  # $4028 MARGIN: 55 PAL scanlines")
+          s = s.replace("    s[31] = 0                   # $4028",
+                        "    s[31] = 55                  # $4028 MARGIN: 55 PAL scanlines\n    s[50] = 0x40                # $403B CDFLAG: request SLOW display mode")
           # Leave CDFLAG at zero and the BASIC editor in FAST mode.
           # The boot/app code will explicitly enter SLOW after setting IY.
           p.write_text(s)
@@ -156,7 +167,7 @@ jobs:
               print(f"{name}: verified SLOW/IY sequence at code offset {pos}")
           PY
           for name in base_g topic_science topic_lifestyle topic_hobby topic_health topic_work topic_art topic_learning topic_literature topic_movies topic_programming topic_astronomy topic_asciiart topic_verse; do cp models16_v05_en/english8_qat_g2.bin "build/zx81/models_en/$name.bin"; done
-          RT16_LAYOUT=ramtop python3 tools/t81build16.py build/zx81/rtchat16.bin build/zx81/rboot16.bin build/zx81/models_en ports/zx81/pio16_release
+          RT16_LAYOUT=ramtop RT16_SYSVARS_TEMPLATE=build/zx81/rtchat16.P python3 tools/t81build16.py build/zx81/rtchat16.bin build/zx81/rboot16.bin build/zx81/models_en ports/zx81/pio16_release
           cp ports/zx81/pio16_release/GLM_v054_RT16_TOPICS.t81 ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
           RT16_LAYOUT=ramtop python3 tools/verify_ramtop_tape.py ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
           ls -lh ports/zx81/pio16_release/PIOCO_AI_English_16K.t81 build/zx81/*.bin
