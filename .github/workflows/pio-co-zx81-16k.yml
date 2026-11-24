@@ -1,0 +1,41 @@
+name: PIOCO ZX81 16K Z88DK build
+
+on:
+  push:
+    branches:
+      - work/pio-co-16k-z88dk-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zx81-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated build branch
+        uses: actions/checkout@v4
+      - name: Build ZX81 16K app and boot with official Z88DK container
+        run: |
+          set -euxo pipefail
+          mkdir -p build/zx81
+          docker pull z88dk/z88dk:latest
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/src" \
+            -w /src/GLM/reference/glm-v0.5.4 \
+            z88dk/z88dk:latest bash -lc '
+              set -euxo pipefail
+              mkdir -p build/zx81
+              DEFS="-DRT_MAX_VOCAB=48 -DRT_MAX_CTX=8 -DRT_MAX_EMB=4 -DRT_MAX_HID=8 -DRT_APP_MODEL_MAX=1100 -DRT_MEM_MAX=6 -DRT_JOURNAL_MAX=8 -DRT_LINE_MAX=64"
+              zcc +zx81 -vn -O2 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
+              zcc +zx81 -vn -O2 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rboot16 ports/zx81/hal_zx81.c ports/zx81/boot16.c
+              test -s build/zx81/rtchat16.P
+              test -s build/zx81/rboot16.P
+              ls -l build/zx81/*.P
+            '
+      - name: Upload Z88DK program images
+        uses: actions/upload-artifact@v4
+        with:
+          name: pio-co-zx81-16k-z88dk-program-images
+          path: GLM/reference/glm-v0.5.4/build/zx81/*.P
+          if-no-files-found: error
