@@ -101,8 +101,8 @@ jobs:
           base64 -d build/zx81/english8_qat_g2.bin.b64 > models16_v05_en/english8_qat_g2.bin
           DEFS="-DZX81_RAMTOP_LAYOUT -DRT_MAX_VOCAB=48 -DRT_MAX_CTX=8 -DRT_MAX_EMB=4 -DRT_MAX_HID=8 -DRT_APP_MODEL_MAX=1100 -DRT_MEM_MAX=6 -DRT_JOURNAL_MAX=8 -DRT_LINE_MAX=64"
           docker pull z88dk/z88dk:latest
-          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O2 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
-          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O2 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rboot16 ports/zx81/hal_zx81.c ports/zx81/boot16.c
+          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
+          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rboot16 ports/zx81/hal_zx81.c ports/zx81/boot16.c
           python3 tools/extract_zx81_rem.py build/zx81/rtchat16.P build/zx81/rtchat16.bin
           python3 tools/extract_zx81_rem.py build/zx81/rboot16.P build/zx81/rboot16.bin
           for name in base_g topic_science topic_lifestyle topic_hobby topic_health topic_work topic_art topic_learning topic_literature topic_movies topic_programming topic_astronomy topic_asciiart topic_verse; do cp models16_v05_en/english8_qat_g2.bin "build/zx81/models_en/$name.bin"; done
