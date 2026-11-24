@@ -225,7 +225,7 @@ def boot_input_program():
         boot_print_line(15, "GENDER F/N"),
         boot_input_line(16, "G", True),
     ]
-    load_line = usrlines("RTBASE16", False)[0]
+    load_line = usrlines("RTBASE16", False)
     lines.append(be16(17) + load_line[2:])
     return lines
 
