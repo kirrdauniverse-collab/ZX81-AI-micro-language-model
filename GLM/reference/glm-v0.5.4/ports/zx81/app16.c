@@ -83,11 +83,11 @@
 /* app-level key codes the HAL folds shifted keys into */
 #define K_PAGEUP   0x1E    /* SHIFT+5 */
 #define K_PAGEDOWN 0x1F    /* SHIFT+0 */
-#define K_RUBOUT   0x12    /* SHIFT+2: backspace mid-line, temp 2 on empty */
+#define K_RUBOUT   8       /* SHIFT+5: ZX81 RUBOUT (ASCII backspace) */
 #define K_TEMP1    0x11    /* SHIFT+1 */
 #define K_TEMP3    0x13    /* SHIFT+3 */
 #define K_TEMP4    0x14    /* SHIFT+4 */
-#define K_REASON   '"'     /* SHIFT+9 = the quote key on an empty line */
+#define K_REASON   0x06    /* SHIFT+9: Z88DK INKEY control code */
 
 static rt_model model;
 static rt_chat chat;
