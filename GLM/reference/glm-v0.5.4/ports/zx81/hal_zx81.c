@@ -21,6 +21,7 @@
  */
 #include <stdio.h>   /* getk() lives here in z88dk 1.8 (not in zx81.h!) */
 #include <zx81.h>
+#include <input.h>
 #include "rt_hal.h"
 
 /* --- console: ZX81 char codes in, ASCII out ---
@@ -93,15 +94,36 @@ static int zx81_ascii(int k)
     return ZX81_TO_ASCII[k];
 }
 
+/* The Z88DK ZX81 INKEY scanner returns one ASCII key only and
+ * rejects multiple simultaneous keys. Waiting for release after each
+ * accepted key gives exactly one character per physical press, even
+ * in accelerated emulators. Shifted command keys are translated into
+ * the app's private control codes. */
 int hal_getchar(void)
 {
-    int k = getk();
-    return k ? zx81_ascii(k) : -1;
+    int k = (int)in_Inkey();
+
+    if (k == 0)
+        return -1;
+
+    /* One press = one event. No typematic repeat in text fields. */
+    in_WaitForNoKey();
+
+    switch (k) {
+    case 27: return 0x11;  /* SHIFT+1: temperature 1 */
+    case 28: return 0x12;  /* SHIFT+2: temperature 2 */
+    case 29: return 0x13;  /* SHIFT+3: temperature 3 */
+    case 30: return 0x14;  /* SHIFT+4: temperature 4 */
+    case 10: return 0x1E;  /* SHIFT+6: scroll/page up */
+    case 11: return 0x1F;  /* SHIFT+7: scroll/page down */
+    case 6:  return 0x06;  /* SHIFT+9: reasoning toggle */
+    default: return k;    /* normal ASCII, ENTER=13, RUBOUT=8 */
+    }
 }
 
 int hal_kbhit(void)
 {
-    return getk() != 0;
+    return in_Inkey() != 0;
 }
 
 /* --- text area rows 8-23; rows 0-7 belong to the scratch tier ---
@@ -171,6 +193,19 @@ static void zx81_advance(void)
 
 void hal_putchar(int c)
 {
+    /* RUBOUT/BS must erase the previous D-file cell as well as move
+     * the software cursor back. Handle row-wrap for longer input. */
+    if (c == 8 || c == 127) {
+        if (zx81_col == 0 && zx81_row > ZX81_TEXT_TOP) {
+            zx81_row--;
+            zx81_col = 32;
+        }
+        if (zx81_col > 0) {
+            zx81_col--;
+            zx81_line(zx81_row)[zx81_col] = 0x00;
+        }
+        return;
+    }
     if (c == '\n') {
         zx81_advance();
         return;
