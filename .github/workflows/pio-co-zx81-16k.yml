@@ -1,4 +1,4 @@
-name: PIOCO ZX81 16K Z88DK build (24-row D-FILE)
+name: PIOCO ZX81 16K ROM INPUT build
 
 on:
   push:
@@ -15,144 +15,7 @@ jobs:
     steps:
       - name: Checkout isolated build branch
         uses: actions/checkout@v4
-      - name: Apply English QAT and full 24-row ZX81 system layout
-        working-directory: GLM/reference/glm-v0.5.4
-        run: |
-          set -euxo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          # App: use the model's actual RTLM size and append the English intent tag.
-          p = Path("ports/zx81/app16.c")
-          s = p.read_text()
-          s = s.replace('#define MSIZE 1030              /* the class-G blob: fixed layout */', '#define MSIZE 1038              /* English8 QAT G2 blob */')
-          s = s.replace('#include "rt_engine.h"\n', '#include "rt_engine.h"\n#include "intent16.h"\n')
-          s = s.replace('rt_chat_push(&chat, line);\n        gen_reply();',
-                        'rt_chat_push(&chat, line);\n        rt_chat_push(&chat, rt16_reply_tag(line));\n        rt_chat_push_idx(&chat, 0);\n        gen_reply();')
-          if 'rt16_reply_tag(line)' not in s or '#define MSIZE 1038' not in s:
-              raise SystemExit("app16 English model/tag patch did not apply cleanly")
-          p.write_text(s)
-          # Fix both entry points: emit literal Z80 opcode LD IY,$4000.
-          # ZX81 SLOW uses (IY+$3B); setting IX leaves the display NMI off.
-          for name in ("boot16.c", "app16.c"):
-              p = Path("ports/zx81") / name
-              t = p.read_text()
-              if "    ld ix, $4000" not in t:
-                  raise SystemExit(f"{name}: SLOW entry instruction not found")
-              t = t.replace("    ld ix, $4000", "    defb $FD,$21,$00,$40")
-              p.write_text(t)
-          # HAL: with 18 display rows, rows 8..15 are the chat console.
-          p = Path("ports/zx81/hal_zx81.c")
-          s = p.read_text()
-          old = '#define ZX81_TEXT_BOT 21  /* rows 22-23 = the ROM\'s lower screen (DF_SZ=2):\n                              never written by us, the ROM owns them */'
-          new = '#ifdef ZX81_RAMTOP_LAYOUT\n#define ZX81_TEXT_BOT 15\n#else\n#define ZX81_TEXT_BOT 21  /* rows 22-23 belong to the ROM */\n#endif'
-          if old not in s:
-              raise SystemExit("HAL text-bottom definition not found")
-          p.write_text(s.replace(old, new))
-          # Tape builder: 18-row D_FILE, dynamic model blob size, and $7F80 stack top.
-          p = Path("tools/t81build16.py")
-          s = p.read_text()
-          old = 'VARS = DFILE + 793\nELINE = VARS + 1\nMSIZE = 1030'
-          new = '''LAYOUT = os.environ.get("RT16_LAYOUT", "legacy").lower()
-          if LAYOUT not in ("legacy", "ramtop"):
-              raise ValueError("RT16_LAYOUT must be legacy or ramtop")
-          # The ZX81 ROM display engine consumes 24 rows every frame.
-          DFILE_LINES = 24
-          DFILE_SIZE = 1 + DFILE_LINES * 33
-          VARS = DFILE + DFILE_SIZE
-          ELINE = VARS + 1'''
-          if old not in s: raise SystemExit("builder constants not found")
-          s = s.replace(old, new)
-          s = s.replace('s[29:31] = le16(0x7FFD)', 's[28:31] = bytes((0xBF, 0xFD, 0xFF))  # $4025 LAST_K, $4027 DEBOUNCE')
-          s = s.replace('s[32:34] = le16(DFILE)      # $4029 = D_FILE copy', 's[32:34] = le16(PROG)       # $4029 NTLIN = first BASIC line')
-          old = '    s = bytearray(116)'
-          new = '''    template_path = os.environ.get("RT16_SYSVARS_TEMPLATE")
-              if template_path:
-                  from pathlib import Path
-                  template_data = Path(template_path).read_bytes()
-                  if len(template_data) < 116:
-                      raise ValueError("Z88DK .P system-variable template is shorter than 116 bytes")
-                  s = bytearray(template_data[:116])
-              else:
-                  s = bytearray(116)'''
-          if old not in s: raise SystemExit("sysvars template insertion point not found")
-          s = s.replace(old, new, 1)
-          s = s.replace('return b"\\x76" + (b"\\x00" * 32 + b"\\x76") * 24',
-                        'return b"\\x76" + (b"\\x00" * 32 + b"\\x76") * DFILE_LINES')
-          marker = '\ndef build_image(code, model, tag_idx, tag_name, load_name, with_save):'
-          helper = '''
-          def model_blob_size(model):
-              """Read the RTLM v2 dimensions and validate the exact blob length."""
-              import struct
-              if len(model) < 94 or model[:4] != b"RTLM":
-                  raise ValueError("invalid RTLM model header")
-              vocab, ctx, emb, h1, h2 = struct.unpack_from("<5H", model, 8)
-              n = 92 + vocab * emb + h1 + h1 * (ctx * emb + 1)
-              if h2:
-                  n += h2 + h2 * (h1 + 1)
-              n += vocab + vocab * ((h2 if h2 else h1) + 1) + 2
-              if n != len(model):
-                  raise ValueError(f"RTLM size mismatch: header says {n}, file has {len(model)}")
-              return n
-          '''
-          if marker not in s: raise SystemExit("builder insertion point not found")
-          s = s.replace(marker, "\n" + helper + marker)
-          s = s.replace('    assert M <= DFILE - 17 - 116 - 12 - MSIZE, \\',
-                        '    msize = model_blob_size(model)\n    assert M <= DFILE - 17 - 116 - 12 - msize, \\')
-          s = s.replace('tag = M + MSIZE', 'tag = M + msize')
-          import re
-          s, count = re.subn(r"assert len.*MSIZE,.*", 'assert len(model) == model_blob_size(model), "invalid RTLM blob size"', s)
-          if count != 1: raise SystemExit(f"expected one fixed model-size assertion, found {count}")
-          s = s.replace('assert Z + len(img) < DFILE - 793, "boot chain too big"',
-                        'assert Z + len(img) < DFILE - DFILE_SIZE, "boot chain too big"')
-          p.write_text(s)
-          # Initialize the real ZX81 PAL video state in the generated system variables.
-          p = Path("tools/t81build16.py")
-          s = p.read_text()
-          s = s.replace("    s[31] = 0                   # $4028",
-                        "    s[31] = 55                  # $4028 MARGIN: 55 PAL scanlines\n    s[50] = 0x40                # $403B CDFLAG: request SLOW display mode")
-          # CDFLAG is initialized to $40 so the ROM SLOW transition is requested.
-          p.write_text(s)
-          # The boot returns a BASIC USR result; declare the correct C return type.
-          p = Path("ports/zx81/boot16.c")
-          t = p.read_text()
-          if "void main(void)" not in t:
-              raise SystemExit("boot16 main signature not found")
-          p.write_text(t.replace("void main(void)", "int main(void)", 1))
-          # Make the BOOT BASIC program use the ROM's own INPUT statement.
-          p = Path("tools/t81build16.py")
-          s = p.read_text()
-          import textwrap
-          helper = textwrap.dedent(r'''
-          def zx_text_codes(text):
-              out = bytearray()
-              for ch in text:
-                  if "A" <= ch <= "Z":
-                      out.append(0x26 + ord(ch) - 65)
-                  elif "0" <= ch <= "9":
-                      out.append(0x1C + ord(ch) - 48)
-                  elif ch == " ":
-                      out.append(0x00)
-                  elif ch == "?":
-                      out.append(0x0F)
-                  elif ch == "-":
-                      out.append(0x16)
-                  elif ch == "/":
-                      out.append(0x18)
-                  else:
-                      raise ValueError("unsupported ZX81 prompt character: " + repr(ch))
-              return bytes(out)
-
-          def boot_basic_line(number, body):
-              return be16(number) + le16(len(body) + 1) + body + b"\x76"
-
-          def boot_print_line(number, text):
-              return boot_basic_line(number, b"\xF5\x0B" + zx_text_codes(text) + b"\x0B")
-
-          def boot_input_line(number, letter, string_value=False):
-              variable = bytes([0x26 + ord(letter) - 65])
-              if string_value:
-                  variable += b"\x0D"   # ZX81 '          PY
-      - name: Build actual English QAT model and ZX81 programs
+      - name: Build ROM INPUT profile and optimized ZX81 program
         working-directory: GLM/reference/glm-v0.5.4
         run: |
           set -euxo pipefail
@@ -161,109 +24,30 @@ jobs:
           UlRMTQIAAAAwAAgABAAIAAAABwAAAAAAAAACAAogYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXosLj8hMDEyMzQ1Njc4OTotLyooKQAAAAAAAAAAAAAAAAAAAADxcAHdxu8NBFVDA0Ms/IDXs6jjDv8D/v4uBA1hAhEE9fUT+v0s9+cB5Mw9PADw/AETCAD+D9qWPxAr5t8cCbUFCPfoGJ7kzjv4CAX/zk0BL+D2wEHp4woh7hFbR4BXJEPRNSHY1SaA6dgn5Te/f+PK1AGAf2fiH6EL+gIHyBYOL//1CviREcJ/8AQSBggL/vz/+/QHEwUD9QoE/v31//7z0BIVHAMCCQEX/ScwBwoHBQQAAvgFDAQA9RAEAv72AfoHBwgHBwgIB7UF9SjtIu8MChDqFBUVKAUDDCcC4xchCsDx1gbsBP8nDBMfwQkcPyTO8hPWMMwPBTwsCQAMyN7nItCwMO9IGAG5Dsjk+wkqJwIp4w4WQPD7+hU2ztM2N/u8AA0sPEdP4ETmCvHp6QTrGRwE/QcDH+Hm8P8QBfsBExr+ICkGAA/oH7kuB/rsKe8dAesECe7zKAcsMvLn9+4I7Rb2/Og3+7vz7Pfq/tbnAu8zAfQb3OkGJvAZNxrcPwVV3Pv3XmytP/oiDCp3FCAK6AW0z/gcA0LBHvA9E7rPPcYH2y4TGiZhLAAFMzROAOvaF8EvCyPS9PToFwAarfQQGxdDByj8DwTNkQm1RwAH+wAAAAAAAQABAQAAAQEAAAAAAAIAAAAAAAAAAAAAAAEAAQABAQECAQEAAQABAQICAeceaYCAAkPC/vYc7zQlGfvA/yoA9vaAtjUrAf8ZgASAENQk/hYkq4CxIy6AAuTJ1PXr6NS8AfAIOSs+CMOAANbuzsfVwNgbANjXxbfN5PTrABryOfb1nxANAeFBjis6yxYkA+bLxPDb4Kri/sH0R6fj5cTc/yWArzO2LeKAARoegNnKL+aPARAmEIC45Dw4/zXuoQ4BDcvnA8e2V13KgAeVAbbi3dasp+Sl/yCTccGAF/Os/e3paKLvHPTHAoCAzDkPNw4k/ycilytE+oCAAS/p+ICeDZAW/v3GU/K2gDfEAv9RgBwsgCUG/iGoBsuAMaoFAgyQK4AV8/M3AP5HgrfTyNA8AfDB+RidECYe/dnS777o+PDR/+UMswa3w89WAPKpnfMA8t3nAAMNvq9Bpu9D/9L206/t5P7Y/8jE6cLexuirAP/x1bPS37zWALidjajY3977/cvTrs799tXk/9T+uMXi5fnW//nMpyFVifwQAd7VwLnY4N/x/5EYptKtNDpPAuHU27ns3OQCAOzj+AHi2P7A/53GsbvK9ZXG/9OIzJK58Iu9/+zTodTb1vPFASDV
           MODEL
           base64 -d build/zx81/english8_qat_g2.bin.b64 > models16_v05_en/english8_qat_g2.bin
+          python3 tools/prepare_pio16_rom_input.py
           DEFS="-DZX81_RAMTOP_LAYOUT -DRT_MAX_VOCAB=48 -DRT_MAX_CTX=8 -DRT_MAX_EMB=4 -DRT_MAX_HID=8 -DRT_APP_MODEL_MAX=1100 -DRT_MEM_MAX=6 -DRT_JOURNAL_MAX=8 -DRT_LINE_MAX=64"
           docker pull z88dk/z88dk:latest
-          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 --opt-code-speed=none -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
+          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
           docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rboot16 ports/zx81/hal_zx81.c ports/zx81/boot16.c
           python3 tools/extract_zx81_rem.py build/zx81/rtchat16.P build/zx81/rtchat16.bin
           python3 tools/extract_zx81_rem.py build/zx81/rboot16.P build/zx81/rboot16.bin
-          python3 - <<'PY'
-          from pathlib import Path
-          signature = bytes.fromhex("FD 21 00 40 CD 2B 0F")
-          for name in ("rtchat16.bin", "rboot16.bin"):
-              data = (Path("build/zx81") / name).read_bytes()
-              pos = data.find(signature)
-              if pos < 0:
-                  raise SystemExit(f"{name}: missing literal LD IY,$4000; CALL $0F2B")
-              print(f"{name}: verified SLOW/IY sequence at code offset {pos}")
-          PY
           for name in base_g topic_science topic_lifestyle topic_hobby topic_health topic_work topic_art topic_learning topic_literature topic_movies topic_programming topic_astronomy topic_asciiart topic_verse; do cp models16_v05_en/english8_qat_g2.bin "build/zx81/models_en/$name.bin"; done
           RT16_LAYOUT=ramtop RT16_SYSVARS_TEMPLATE=build/zx81/rtchat16.P python3 tools/t81build16.py build/zx81/rtchat16.bin build/zx81/rboot16.bin build/zx81/models_en ports/zx81/pio16_release
-          cp ports/zx81/pio16_release/GLM_v054_RT16_TOPICS.t81 ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
-          RT16_LAYOUT=ramtop python3 tools/verify_ramtop_tape.py ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
-          ls -lh ports/zx81/pio16_release/PIOCO_AI_English_16K.t81 build/zx81/*.bin
-      - name: Upload PIOCO ZX81 16K cassette
-        uses: actions/upload-artifact@v4
-        with:
-          name: PIOCO_AI_English_16K
-          path: |
-            GLM/reference/glm-v0.5.4/ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
-            GLM/reference/glm-v0.5.4/build/zx81/*.P
-            GLM/reference/glm-v0.5.4/build/zx81/*.bin
-          if-no-files-found: error
- suffix token
-              return boot_basic_line(number, b"\xEE" + variable)  # ROM INPUT token
-
-          def boot_input_program():
-              lines = [
-                  boot_print_line(2, "PIOCO AI PROFILE"),
-                  boot_print_line(3, "YEAR"),
-                  boot_input_line(4, "Y"),
-                  boot_print_line(5, "MONTH"),
-                  boot_input_line(6, "M"),
-                  boot_print_line(7, "DAY"),
-                  boot_input_line(8, "D"),
-                  boot_print_line(9, "HOUR"),
-                  boot_input_line(10, "H"),
-                  boot_print_line(11, "MINUTE"),
-                  boot_input_line(12, "N"),
-                  boot_print_line(13, "NAME"),
-                  boot_input_line(14, "A", True),
-                  boot_print_line(15, "GENDER F/N"),
-                  boot_input_line(16, "G", True),
-              ]
-              load_line = usrlines("RTBASE16", False)[0]
-              lines.append(be16(17) + load_line[2:])
-              return lines
-          ''')
-          marker = '\ndef build_boot(code):'
-          if marker not in s:
-              raise SystemExit("build_boot insertion point not found")
-          s = s.replace(marker, "\n" + helper + marker, 1)
-          old = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76",
-             usrlines("RTBASE16", False)]'''
-          new = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76"] + boot_input_program()'''
-          if old not in s:
-              raise SystemExit("build_boot old USR-only line sequence not found")
-          s = s.replace(old, new, 1)
-          p.write_text(s)
-          PY
-      - name: Build actual English QAT model and ZX81 programs
-        working-directory: GLM/reference/glm-v0.5.4
-        run: |
-          set -euxo pipefail
-          mkdir -p build/zx81/models_en models16_v05_en ports/zx81/pio16_release
-          cat > build/zx81/english8_qat_g2.bin.b64 <<'MODEL'
-          UlRMTQIAAAAwAAgABAAIAAAABwAAAAAAAAACAAogYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXosLj8hMDEyMzQ1Njc4OTotLyooKQAAAAAAAAAAAAAAAAAAAADxcAHdxu8NBFVDA0Ms/IDXs6jjDv8D/v4uBA1hAhEE9fUT+v0s9+cB5Mw9PADw/AETCAD+D9qWPxAr5t8cCbUFCPfoGJ7kzjv4CAX/zk0BL+D2wEHp4woh7hFbR4BXJEPRNSHY1SaA6dgn5Te/f+PK1AGAf2fiH6EL+gIHyBYOL//1CviREcJ/8AQSBggL/vz/+/QHEwUD9QoE/v31//7z0BIVHAMCCQEX/ScwBwoHBQQAAvgFDAQA9RAEAv72AfoHBwgHBwgIB7UF9SjtIu8MChDqFBUVKAUDDCcC4xchCsDx1gbsBP8nDBMfwQkcPyTO8hPWMMwPBTwsCQAMyN7nItCwMO9IGAG5Dsjk+wkqJwIp4w4WQPD7+hU2ztM2N/u8AA0sPEdP4ETmCvHp6QTrGRwE/QcDH+Hm8P8QBfsBExr+ICkGAA/oH7kuB/rsKe8dAesECe7zKAcsMvLn9+4I7Rb2/Og3+7vz7Pfq/tbnAu8zAfQb3OkGJvAZNxrcPwVV3Pv3XmytP/oiDCp3FCAK6AW0z/gcA0LBHvA9E7rPPcYH2y4TGiZhLAAFMzROAOvaF8EvCyPS9PToFwAarfQQGxdDByj8DwTNkQm1RwAH+wAAAAAAAQABAQAAAQEAAAAAAAIAAAAAAAAAAAAAAAEAAQABAQECAQEAAQABAQICAeceaYCAAkPC/vYc7zQlGfvA/yoA9vaAtjUrAf8ZgASAENQk/hYkq4CxIy6AAuTJ1PXr6NS8AfAIOSs+CMOAANbuzsfVwNgbANjXxbfN5PTrABryOfb1nxANAeFBjis6yxYkA+bLxPDb4Kri/sH0R6fj5cTc/yWArzO2LeKAARoegNnKL+aPARAmEIC45Dw4/zXuoQ4BDcvnA8e2V13KgAeVAbbi3dasp+Sl/yCTccGAF/Os/e3paKLvHPTHAoCAzDkPNw4k/ycilytE+oCAAS/p+ICeDZAW/v3GU/K2gDfEAv9RgBwsgCUG/iGoBsuAMaoFAgyQK4AV8/M3AP5HgrfTyNA8AfDB+RidECYe/dnS777o+PDR/+UMswa3w89WAPKpnfMA8t3nAAMNvq9Bpu9D/9L206/t5P7Y/8jE6cLexuirAP/x1bPS37zWALidjajY3977/cvTrs799tXk/9T+uMXi5fnW//nMpyFVifwQAd7VwLnY4N/x/5EYptKtNDpPAuHU27ns3OQCAOzj+AHi2P7A/53GsbvK9ZXG/9OIzJK58Iu9/+zTodTb1vPFASDV
-          MODEL
-          base64 -d build/zx81/english8_qat_g2.bin.b64 > models16_v05_en/english8_qat_g2.bin
-          DEFS="-DZX81_RAMTOP_LAYOUT -DRT_MAX_VOCAB=48 -DRT_MAX_CTX=8 -DRT_MAX_EMB=4 -DRT_MAX_HID=8 -DRT_APP_MODEL_MAX=1100 -DRT_MEM_MAX=6 -DRT_JOURNAL_MAX=8 -DRT_LINE_MAX=64"
-          docker pull z88dk/z88dk:latest
-          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 --opt-code-speed=none -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
-          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rboot16 ports/zx81/hal_zx81.c ports/zx81/boot16.c
-          python3 tools/extract_zx81_rem.py build/zx81/rtchat16.P build/zx81/rtchat16.bin
-          python3 tools/extract_zx81_rem.py build/zx81/rboot16.P build/zx81/rboot16.bin
+          cp ports/zx81/pio16_release/GLM_v054_RT16_TOPICS.t81 ports/zx81/pio16_release/PIOCO_AI_English_16K_ROM_INPUT.t81
+          RT16_LAYOUT=ramtop python3 tools/verify_ramtop_tape.py ports/zx81/pio16_release/PIOCO_AI_English_16K_ROM_INPUT.t81
           python3 - <<'PY'
           from pathlib import Path
-          signature = bytes.fromhex("FD 21 00 40 CD 2B 0F")
-          for name in ("rtchat16.bin", "rboot16.bin"):
-              data = (Path("build/zx81") / name).read_bytes()
-              pos = data.find(signature)
-              if pos < 0:
-                  raise SystemExit(f"{name}: missing literal LD IY,$4000; CALL $0F2B")
-              print(f"{name}: verified SLOW/IY sequence at code offset {pos}")
+          data = Path('ports/zx81/pio16_release/PIOCO_AI_English_16K_ROM_INPUT.t81').read_bytes()
+          assert data.startswith(b'EO81')
+          print('ROM INPUT cassette generated:', len(data), 'bytes')
           PY
-          for name in base_g topic_science topic_lifestyle topic_hobby topic_health topic_work topic_art topic_learning topic_literature topic_movies topic_programming topic_astronomy topic_asciiart topic_verse; do cp models16_v05_en/english8_qat_g2.bin "build/zx81/models_en/$name.bin"; done
-          RT16_LAYOUT=ramtop RT16_SYSVARS_TEMPLATE=build/zx81/rtchat16.P python3 tools/t81build16.py build/zx81/rtchat16.bin build/zx81/rboot16.bin build/zx81/models_en ports/zx81/pio16_release
-          cp ports/zx81/pio16_release/GLM_v054_RT16_TOPICS.t81 ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
-          RT16_LAYOUT=ramtop python3 tools/verify_ramtop_tape.py ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
-          ls -lh ports/zx81/pio16_release/PIOCO_AI_English_16K.t81 build/zx81/*.bin
-      - name: Upload PIOCO ZX81 16K cassette
+          ls -lh ports/zx81/pio16_release/PIOCO_AI_English_16K_ROM_INPUT.t81 build/zx81/*.bin
+      - name: Upload PIOCO ZX81 16K ROM INPUT cassette
         uses: actions/upload-artifact@v4
         with:
-          name: PIOCO_AI_English_16K
+          name: PIOCO_AI_English_16K_ROM_INPUT
           path: |
-            GLM/reference/glm-v0.5.4/ports/zx81/pio16_release/PIOCO_AI_English_16K.t81
+            GLM/reference/glm-v0.5.4/ports/zx81/pio16_release/PIOCO_AI_English_16K_ROM_INPUT.t81
             GLM/reference/glm-v0.5.4/build/zx81/*.P
             GLM/reference/glm-v0.5.4/build/zx81/*.bin
           if-no-files-found: error
