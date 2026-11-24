@@ -105,34 +105,12 @@ jobs:
           s = s.replace('assert Z + len(img) < DFILE - 793, "boot chain too big"',
                         'assert Z + len(img) < DFILE - DFILE_SIZE, "boot chain too big"')
           p.write_text(s)
-          # Correct the verifier too: RAMTOP is at $4004-$4005, outside a
-          # .P image that starts at $4009. Offsets 28..30 are LAST_K/DEBOUNCE.
-          p = Path("tools/verify_ramtop_tape.py")
-          v = p.read_text()
-          v = v.replace(
-              'if b.DFILE_LINES!=18 or b.DFILE!=0x7B00 or b.RAMTOP_ADDR!=0x7F80:',
-              'if b.DFILE_LINES!=18 or b.DFILE!=0x7B00:')
-          v = v.replace(
-              'if int.from_bytes(image[29:31],"little")!=b.RAMTOP_ADDR: raise SystemExit(f"{name}: RAMTOP mismatch")',
-              'if image[28:31] != bytes((0xBF, 0xFD, 0xFF)): raise SystemExit(f"{name}: LAST_K/DEBOUNCE initial state mismatch")')
-          v = v.replace(
-              'print(f"PASS: 15 EO81 blocks; D_FILE=${b.DFILE:04X}; VARS=${b.VARS:04X}; RAMTOP=${b.RAMTOP_ADDR:04X}")',
-              'print(f"PASS: 15 EO81 blocks; D_FILE=${b.DFILE:04X}; VARS=${b.VARS:04X}; LAST_K=$FDBF; DEBOUNCE=$FF")')
-          # $4029 (offset 32) is NTLIN and must point to program start.
-          needle = 'if int.from_bytes(image[7:9],"little")!=b.VARS: raise SystemExit(f"{name}: VARS mismatch")'
-          v = v.replace(
-              needle,
-              needle + '\n        if int.from_bytes(image[32:34],"little")!=b.PROG: raise SystemExit(f"{name}: NTLIN mismatch")')
-          if "RAMTOP mismatch" in v or "LAST_K/DEBOUNCE initial state mismatch" not in v or "NTLIN mismatch" not in v:
-              raise SystemExit("system-variable verifier correction did not apply")
-          p.write_text(v)
           # Initialize the real ZX81 PAL video state in the generated system variables.
           p = Path("tools/t81build16.py")
           s = p.read_text()
           s = s.replace("    s[31] = 0                   # $4028",
                         "    s[31] = 55                  # $4028 MARGIN: 55 PAL scanlines\n    s[50] = 0x40                # $403B CDFLAG: request SLOW display mode")
-          # Leave CDFLAG at zero and the BASIC editor in FAST mode.
-          # The boot/app code will explicitly enter SLOW after setting IY.
+          # CDFLAG is initialized to $40 so the ROM SLOW transition is requested.
           p.write_text(s)
           # The boot returns a BASIC USR result; declare the correct C return type.
           p = Path("ports/zx81/boot16.c")
