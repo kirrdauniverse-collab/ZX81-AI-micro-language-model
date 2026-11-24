@@ -109,9 +109,10 @@ jobs:
               'print(f"PASS: 15 EO81 blocks; D_FILE=${b.DFILE:04X}; VARS=${b.VARS:04X}; RAMTOP=${b.RAMTOP_ADDR:04X}")',
               'print(f"PASS: 15 EO81 blocks; D_FILE=${b.DFILE:04X}; VARS=${b.VARS:04X}; LAST_K=$FDBF; DEBOUNCE=$FF")')
           # $4029 (offset 32) is NTLIN and must point to program start.
+          needle = 'if int.from_bytes(image[7:9],"little")!=b.VARS: raise SystemExit(f"{name}: VARS mismatch")'
           v = v.replace(
-              'if int.from_bytes(image[32:34],"little")!=b.DFILE: raise SystemExit(f"{name}: RAMTOP mismatch")',
-              'if int.from_bytes(image[32:34],"little")!=b.PROG: raise SystemExit(f"{name}: NTLIN mismatch")')
+              needle,
+              needle + '\\n        if int.from_bytes(image[32:34],"little")!=b.PROG: raise SystemExit(f"{name}: NTLIN mismatch")')
           if "RAMTOP mismatch" in v or "LAST_K/DEBOUNCE initial state mismatch" not in v or "NTLIN mismatch" not in v:
               raise SystemExit("system-variable verifier correction did not apply")
           p.write_text(v)
