@@ -89,6 +89,8 @@ write("ports/zx81/boot16.c", boot)
 # Full 24-row screen file and correct system variables.
 p = "tools/t81build16.py"
 s = read(p)
+if "from pathlib import Path" not in s:
+    s = s.replace("import sys\n", "import sys\nfrom pathlib import Path\n", 1)
 s = replace_once(s,
     "VARS = DFILE + 793\nELINE = VARS + 1\nMSIZE = 1030",
     'LAYOUT = os.environ.get("RT16_LAYOUT", "legacy").lower()\n'
