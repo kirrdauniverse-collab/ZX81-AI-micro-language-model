@@ -17,8 +17,8 @@ def blocks(path):
     while pos < len(data):
         if pos + 48 > len(data):
             raise ValueError("truncated block header")
-        name = data[pos:pos+32].split(b"\\0", 1)[0].decode("ascii")
-        size = int(data[pos+32:pos+48].split(b"\\0", 1)[0])
+        name = data[pos:pos+32].split(b"\0", 1)[0].decode("ascii")
+        size = int(data[pos+32:pos+48].split(b"\0", 1)[0])
         pos += 48
         if pos + size > len(data):
             raise ValueError(f"truncated payload in {name}")
