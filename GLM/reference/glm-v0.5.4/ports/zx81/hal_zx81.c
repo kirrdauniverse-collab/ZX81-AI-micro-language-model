@@ -227,7 +227,7 @@ rt_u32 hal_entropy(void)
 /* --- Hidden ring-buffer RAM, located after the last topic image and
  * before D_FILE. These bytes are ordinary RAM, not display cells, so
  * the ROM video generator never renders them. Build asserts that every
- * topic image ends below $7A30; this ring occupies $7A78-$7AF7. */
+ * topic image ends below $7A72; this ring occupies $7ABA-$7AF9. */
 #define ZX81_RING_BASE  0x7ABA
 #define ZX81_RING_CELLS 64
 
