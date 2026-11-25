@@ -101,10 +101,8 @@ static rt_u8 b[ST_BYTES];
 static char uname[9];
 static unsigned int now;       /* days since 2000, from the profile */
 
-/* the scrollback: work rows 3-7 = 160 cells of 6 bits = 160 chars =
- * 5 rows of 32, packed (display codes are 0x00-0x3F so 6 bits are
- * enough). Lives INSIDE the display file, so an editor shift moves it
- * with everything else and it costs no separate RAM. */
+/* The scrollback ring is 64 bytes at $7ABA, outside D_FILE. The
+ * image builder reserves this gap across every topic LOAD. */
 #define RING_CELLS 64
 #define RING_BASE  0                /* hidden RAM ring at $7ABA */
 
