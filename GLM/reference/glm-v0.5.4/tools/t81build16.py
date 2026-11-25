@@ -60,6 +60,7 @@ Z = 0x4009
 PROG = 0x407D
 CODE_ORG = 16514
 DFILE = 0x7B00
+SCRATCH_BASE = 0x7A30  # hidden profile + ring RAM, preserved by short LOAD blocks
 VARS = DFILE + 793
 ELINE = VARS + 1
 MSIZE = 1030
@@ -232,7 +233,7 @@ def build_image(code, model, tag_idx, tag_name, load_name, with_save):
         img += zx_name(nm)
     img += b"\x00\x00"
     tabend = Z + len(img) - 1
-    assert tabend <= DFILE - 17, f"name table ends 0x{tabend:04X}, want <= 0x{DFILE-17:04X}"
+    assert tabend < SCRATCH_BASE, f"topic image ends 0x{tabend:04X}, hidden RAM starts 0x{SCRATCH_BASE:04X}"
     assert img[M - Z:M - Z + 4] == b"RTLM"
     slot = PROG + 4 + 1 + len(code) + 4 + 24
     assert 0x4086 <= slot < M - 4, f"LOAD slot at 0x{slot:04X}?"
