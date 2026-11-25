@@ -165,6 +165,16 @@ void hal_console_reset(void)
     zx81_col = 0;
 }
 
+void hal_console_char_at(long cell, char c)
+{
+    long row, col;
+    if (cell < 0 || cell >= (long)(22 * 32))
+        return;
+    row = cell / 32;
+    col = cell % 32;
+    zx81_line((int)row)[(int)col] = zx81_code(c);
+}
+
 void hal_putchar(int c)
 {
     /* RUBOUT/BS must erase the previous D-file cell as well as move
@@ -237,7 +247,7 @@ void hal_scratch_put(long i, rt_u8 v)
 
 void hal_scratch_char(long i, char c)
 {
-    hal_scratch_put(i, zx81_code(c));
+    hal_scratch_put(i, (rt_u8)c);
 }
 
 void hal_panic(const char *msg)
