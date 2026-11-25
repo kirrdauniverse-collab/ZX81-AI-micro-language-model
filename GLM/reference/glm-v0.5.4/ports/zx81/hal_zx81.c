@@ -89,7 +89,7 @@ int hal_kbhit(void)
  * all 24 lines and scramble the stored cells. Only real single-cell
  * glyph codes are written (0x00-0x3F); keyword/control codes and the
  * 0x76 (HALT) line terminator never appear. */
-#define ZX81_TEXT_TOP 8
+#define ZX81_TEXT_TOP 0
 #define ZX81_TEXT_BOT 21  /* rows 22-23 = the ROM's lower screen (DF_SZ=2):
                               never written by us, the ROM owns them */
 
@@ -149,6 +149,22 @@ static void zx81_advance(void)
     }
 }
 
+void hal_console_reset(void)
+{
+    int row, col;
+
+    /* Rows 0-21 are the application console. The two lower rows remain
+     * owned by the ROM INPUT editor. Clear only character cells; never
+     * touch the $76 row terminators. */
+    for (row = 0; row <= ZX81_TEXT_BOT; row++) {
+        rt_u8 *line = zx81_line(row);
+        for (col = 0; col < 32; col++)
+            line[col] = 0x00;
+    }
+    zx81_row = ZX81_TEXT_TOP;
+    zx81_col = 0;
+}
+
 void hal_putchar(int c)
 {
     /* RUBOUT/BS must erase the previous D-file cell as well as move
@@ -198,26 +214,30 @@ rt_u32 hal_entropy(void)
     return (rt_u32)f[0] | ((rt_u32)f[1] << 8) | 0x81000000UL;
 }
 
-/* --- screen-RAM scratch tier: D-file rows 0-7, 256 cells x 6 bit ---
- * The ZX81 ROM renders every D-file cell, so only real glyph codes
- * (0x00-0x3F) may be stored; the app packs its session state 3 bytes
- * -> 4 cells. Rows 6-7 hold the packed state, rows 0-1 the live
- * context window (see app16.c). */
+/* --- Hidden ring-buffer RAM, located after the last topic image and
+ * before D_FILE. These bytes are ordinary RAM, not display cells, so
+ * the ROM video generator never renders them. Build asserts that every
+ * topic image ends below $7A30; this ring occupies $7A78-$7AF7. */
+#define ZX81_RING_BASE  0x7A78
+#define ZX81_RING_CELLS 128
+
 rt_u8 hal_scratch_get(long i)
 {
-    return zx81_line((int)(i / 32))[i % 32];
+    if (i < 0 || i >= ZX81_RING_CELLS)
+        return 0;
+    return *((volatile rt_u8 *)(ZX81_RING_BASE + (unsigned)i));
 }
 
 void hal_scratch_put(long i, rt_u8 v)
 {
-    /* v is a packed 6-bit value: always a legal, single-cell glyph */
-    zx81_line((int)(i / 32))[i % 32] = v;
+    if (i < 0 || i >= ZX81_RING_CELLS)
+        return;
+    *((volatile rt_u8 *)(ZX81_RING_BASE + (unsigned)i)) = v;
 }
 
-/* show one ASCII char in scratch cell i (row 0/1 context display) */
 void hal_scratch_char(long i, char c)
 {
-    zx81_line((int)(i / 32))[i % 32] = zx81_code(c);
+    hal_scratch_put(i, zx81_code(c));
 }
 
 void hal_panic(const char *msg)
