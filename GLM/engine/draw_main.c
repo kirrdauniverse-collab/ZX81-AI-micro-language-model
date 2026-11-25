@@ -17,11 +17,12 @@ static void run(const char *t) {
 int main(void) {
     uc r;
     pz_init();
+    if (!pz_ok) { scr_init(); text_at(10, 0, "RUN THE LOADER FIRST (RAMTOP)", 0); for (;;) ; }
     in0 = 18; inrows = 3;
     scr_init();
-    fillr(0, INV); text_at(0, 0, "PICO AI - DRAW PACK V0.1", INV);
-    fillr(17, INV); text_at(17, 0, "CIRCLE BOX SQUARE LINE TRIANGLE", INV);
-    text_at(22, 0, "BIG SMALL LEFT RIGHT NEXT CLEAR", 0);
+    fillr(0, INV); text_at(0, 0, "PICO AI - DRAW PACK V0.2", INV);
+    fillr(17, INV); text_at(17, 0, "HOUSE CAR TREE SUN STAR HEART", INV);
+    text_at(22, 0, "BIG SMALL LEFT NEXT ABOVE UNDO", 0);
     for (r = 0; r < 16; r++) fillr(1 + r, 0);
     clock_boot();
     draw_status("DRAW READY. TYPE BACK TO LEAVE");

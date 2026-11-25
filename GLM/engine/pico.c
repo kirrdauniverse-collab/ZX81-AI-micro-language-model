@@ -34,10 +34,10 @@ static const u8 *succ_of(uc tok) {                 /* successor list of a token:
     return p;
 }
 
-char rbuf[224];               /* reply text (lines already wrapped at 32 columns, '\n' separated) */
+char rbuf[180];               /* reply text (lines already wrapped at 32 columns, '\n' separated) */
 static u8 rlen;
 u8 ntok_in, ntok_out;
-static void outc(char c) { if (rlen < 222) rbuf[rlen++] = c; rbuf[rlen] = 0; }
+static void outc(char c) { if (rlen < 178) rbuf[rlen++] = c; rbuf[rlen] = 0; }
 u8 *pico_ctx(void) { return ctx; }
 static void out_word(const char *w, uc nospace) {
     uc l = (uc)strlen(w);
@@ -57,68 +57,59 @@ static void say(const char *s) {                 /* write a plain message word b
     }
 }
 
+void think_cb(uc phase, uc x, uc y);              /* shows what the model is doing (defined by the front end) */
+
 /* ---- tokenizer ---- */
-static uc stem(const char *w, char *o) {          /* strips simple English endings; returns new length */
-    uc n = 0;
-    while (w[n] && n < 15) { o[n] = w[n]; n++; }
-    o[n] = 0;
-    if (n > 5 && !memcmp(o + n - 3, "ING", 3)) n -= 3;
-    else if (n > 4 && !memcmp(o + n - 2, "ED", 2)) n -= 2;
-    else if (n > 4 && !memcmp(o + n - 2, "ES", 2)) n -= 2;
-    else if (n > 4 && !memcmp(o + n - 2, "LY", 2)) n -= 2;
-    else if (n > 4 && !memcmp(o + n - 2, "ER", 2)) n -= 2;
-    else if (n > 3 && o[n - 1] == 'S' && o[n - 2] != 'S') n -= 1;
-    o[n] = 0;
-    return n;
-}
-static uc edist(const char *a, uc la, const char *b, uc lb) {   /* Levenshtein, capped at 9 */
-    u8 prev[17], cur[17]; uc i, j, c, m;
-    if (la > 15 || lb > 15) return 9;
-    for (j = 0; j <= lb; j++) prev[j] = j;
-    for (i = 1; i <= la; i++) {
-        cur[0] = i;
-        for (j = 1; j <= lb; j++) {
-            c = prev[j - 1] + (a[i - 1] != b[j - 1]);
-            m = prev[j] + 1; if (m < c) c = m;
-            m = cur[j - 1] + 1; if (m < c) c = m;
-            cur[j] = c;
-        }
-        memcpy(prev, cur, lb + 1);
+static uc near1(const char *a, uc la, const char *b, uc lb) {   /* edit distance <= 1 (one typo, missing or extra letter) */
+    uc i = 0, j = 0, e = 0;
+    if (la > lb + 1 || lb > la + 1) return 0;
+    while (i < la && j < lb) {
+        if (a[i] == b[j]) { i++; j++; continue; }
+        if (e++) return 0;
+        if (la > lb) i++; else if (lb > la) j++; else { i++; j++; }
     }
-    return prev[lb];
+    return e + (la - i) + (lb - j) <= 1;
 }
-static uc lookup(const char *w) {                 /* word -> token id or 0 ; exact, stem, or near match */
-    char s1[16], s2[16];
-    uc l1, l2, id, best = 0, bd = 9, d, lv, lw = (uc)strlen(w);
+const char *pico_alias;                           /* taught words: 4 x (alias[8], meaning[8]) in the persistent zone */
+static uc suffix_ok(const char *r) {              /* common English endings */
+    return !strcmp(r, "S") || !strcmp(r, "ES") || !strcmp(r, "ED") || !strcmp(r, "D") || !strcmp(r, "ING") || !strcmp(r, "ER") || !strcmp(r, "LY");
+}
+static uc lookup(const char *w) {                 /* word -> token id or 0 ; exact, ending, taught alias or near match */
+    uc id, best = 0, lv, k, lw = (uc)strlen(w);
     const char *v;
     for (id = 2, v = vstr; id < NVOC; id++, v += strlen(v) + 1)
         if (!strcmp(v, w)) return id;
     if (lw < 3) return 0;
-    l1 = stem(w, s1);
-    for (id = 2, v = vstr; id < NVOC; id++, v += strlen(v) + 1) {
-        if (v[0] != w[0] && v[1] != w[1]) continue;       /* pre-filter: a typo rarely changes both first letters */
-        lv = (uc)strlen(v);
-        if (lv + 2 < lw || lw + 2 < lv || v[0] < 'A') continue;   /* and the length must be close */
-        l2 = stem(v, s2);
-        if (l1 == l2 && !strcmp(s1, s2)) return id;
-        if (lw >= 4) {
-            d = edist(w, lw, v, lv);
-            if (d < bd) { bd = d; best = id; }
-        }
+    for (k = 0; pico_alias && k < 4; k++) {          /* words the user has taught */
+        const char *e = pico_alias + k * 16;
+        if (e[0] && !strcmp(e, w) && strcmp(e, e + 8)) return lookup(e + 8);
     }
-    if (best && ((lw >= 4 && bd <= 1) || (lw >= 8 && bd <= 2))) return best;
-    return 0;
+    for (id = 2, v = vstr; id < NVOC; id++, v += strlen(v) + 1) {
+        lv = (uc)strlen(v);
+        if (lv >= 3 && lw > lv && !memcmp(w, v, lv) && suffix_ok(w + lv)) return id;      /* PLANETS -> PLANET */
+        if (lw >= 4 && (v[0] == w[0] || v[1] == w[1]) && v[0] >= 'A' && near1(w, lw, v, lv)) best = id;   /* typos */
+    }
+    return best;
 }
+uc pico_known(const char *w) { return lookup(w); }
+const char *pico_word(uc id) { return vword(id); }
+static void mood(const char *w) { uc id = lookup(w); if (id) ctx[id >> 3] |= 1 << (id & 7); }
 static uc tokenize(const char *line) {             /* fills ctx, returns number of recognised words */
     char w[17]; uc n = 0, hits = 0, id;
     memset(ctx, 0, sizeof ctx); unk = 0;
     for (;; line++) {
         char c = *line;
         if (c >= 'a' && c <= 'z') c -= 32;
+        if (c == ':' && !n && line[1]) {             /* smileys  :)  :D  :(  :O */
+            id = line[1] & 0xDF;
+            if (line[1] == ')' || id == 'D') { mood("SMILE"); hits++; line++; continue; }
+            if (line[1] == '(') { mood("SAD"); hits++; line++; continue; }
+            if (id == 'O') { mood("WOW"); hits++; line++; continue; }
+        }
         if (c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') { if (n < 16) w[n++] = c; }
         else {
             if (n) { w[n] = 0; id = lookup(w); if (id) { ctx[id >> 3] |= 1 << (id & 7); hits++; }
-                else if (n >= 3 && w[0] > '9') { if (!unk) strcpy(unkw, w); unk++; }
+                else if (n >= 4 && w[0] > '9') { if (!unk || n > strlen(unkw)) strcpy(unkw, w); unk++; }
                 n = 0; }
             if (!c) break;
         }
@@ -155,6 +146,7 @@ void pico_reply(const char *line, u16 sd) {
     if (sd) seed = sd;
     ntok_out = 0;
     tokenize(line);
+    think_cb(1, 0, 0);
     /* 1. retrieval: choose the sentence that matches the input best */
     for (i = 0, st = 0; i < NSENT; i++) {
         sc = 0; cm = 0; sm = 0; ln = 0; mk = 0; memset(seen, 0, 32);
@@ -172,10 +164,11 @@ void pico_reply(const char *line, u16 sd) {
         if (sc >= bs) { bs = sc; bstart = st; bcm = cm; bsm = sm; }
         st = p + 1;
     }
+    think_cb(2, bs >> 3, 0);
     /* nothing sensible found: say so instead of guessing */
     rlen = 0; rbuf[0] = 0; col = 0;
     if (unk && bcm <= 1) {
-        say("SORRY , I DO NOT KNOW THE WORD"); say(unkw); say(". TRY OTHER WORDS ."); return;
+        say("SORRY , I DO NOT KNOW THE WORD"); say(unkw); say(". TEACH ME :"); say(unkw); say("MEANS A WORD I KNOW ."); return;
     }
     if (bcm == 0 && bsm < 3) { say("SORRY , I HAVE NO DATA ABOUT THAT . ASK ME SOMETHING ELSE ."); return; }
     /* 2. generate from the first word of that sentence, walking the bigram table */
@@ -187,6 +180,7 @@ void pico_reply(const char *line, u16 sd) {
         const u8 *bp = succ_of(cur);
         for (nsucc = 0; bp[nsucc]; nsucc++) ;
         if (!nsucc) break;
+        think_cb(3, n, nsucc);
         follow = nsucc * kfol[temperature];
         for (tot = 0, i = 0; i < nsucc; i++) tot += swgt(bp[i], p + pos, follow, divg);
         r = (u16)((rnd() << 8 | rnd()) % tot);

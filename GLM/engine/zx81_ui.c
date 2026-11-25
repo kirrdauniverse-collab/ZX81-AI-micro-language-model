@@ -8,28 +8,17 @@ extern u8 temperature;
 
 #define INV 128
 #define CH0 1
-#define CH1 12
 #define ST0 14
-#define PZ_ADDR 0x7F80             /* persistent zone (128 bytes at the very top): above RAMTOP, survives NEW and LOAD */
+#define PZ_ADDR 0x7F40             /* persistent zone (192 bytes at the very top): above RAMTOP, survives NEW and LOAD */
 
 /* ---- persistent zone: lives above RAMTOP (the loader sets RAMTOP to $7F00); a local copy is used if RAMTOP is not set ---- */
-struct PZ {
-    u8 mg0, mg1;                   /* 'P','Z' = valid */
-    u8 req;                        /* pack request for the BASIC loader lines: 0 none, 1 DRAW, 6 base */
-    u8 temp;
-    u8 h_, m_, s_, a_, clk;        /* clock and "clock was set" flag */
-    u8 nusers, cur;
-    char names[3][9];
-    char bot[9];
-    char carry[48];                /* text handed to the next pack */
-};
-static struct PZ local;
+#include "pz.h"
 static struct PZ *pz;
 static uc hh, mm, ss, acc, pz_ok;            /* clock kept in plain variables, copied to the zone once a second */
 static void pz_save(void) { pz->h_ = hh; pz->m_ = mm; pz->s_ = ss; pz->a_ = acc; }
 static void pz_init(void) {
     pz_ok = (*(uc *)16388 == PZ_ADDR);
-    pz = pz_ok ? (struct PZ *)PZ_ADDR : &local;
+    pz = (struct PZ *)PZ_ADDR;
     if (pz->mg0 != 'P' || pz->mg1 != 'Z') {
         memset(pz, 0, sizeof(struct PZ)); pz->mg0 = 'P'; pz->mg1 = 'Z'; pz->temp = 2;
     }
@@ -39,6 +28,7 @@ static void pz_init(void) {
 }
 
 /* ---- display file ---- */
+static uc ch1 = 12;                         /* last chat row */
 static u8 *dfile;                           /* the expanded display file the .P image already contains: 1 + 24 rows * 33 */
 static u8 *cell(uc r, uc c) { return dfile + 1 + r * 33 + c; }
 static void wait_frame(void) {
@@ -68,9 +58,9 @@ static void scr_init(void) {
     for (r = 0; r < 24; r++) { fillr(r, 0); *cell(r, 32) = 0x76; }
 }
 static void chat_line(const char *s, uc inv) {
-    memmove(cell(CH0, 0), cell(CH0 + 1, 0), (CH1 - CH0) * 33);
-    fillr(CH1, inv);
-    text_at(CH1, 0, s, inv);
+    memmove(cell(CH0, 0), cell(CH0 + 1, 0), (ch1 - CH0) * 33);
+    fillr(ch1, inv);
+    text_at(ch1, 0, s, inv);
 }
 static void chat_text(const char *s) {     /* word wrap at 32 columns, '\n' forces a break */
     char ln[33]; uc n, i, j;
@@ -101,12 +91,14 @@ static uc frames(void) { return 0xFFFF - *(uc *)16436; }     /* FRAMES counts do
 static uc tick_clock(void) {                /* returns 1 when the second changed */
     uc now = frames(), ch = 0;
     acc += now - lastf; lastf = now;
-    while (acc >= 50) { acc -= 50; ch = 1; if (++ss == 60) { ss = 0; if (++mm == 60) { mm = 0; if (++hh == 24) hh = 0; } } }
+    while (acc >= 50) { acc -= 50; ch = 1; if (++ss == 60) { ss = 0; if (++mm == 60) { mm = 0; if (++hh == 24) { hh = 0; pz->dayc++; } } } }
     if (ch) pz_save();
     return ch;
 }
 
 /* ---- info panel ---- */
+static const char *uname(void) { return pz->names[pz->cur][0] ? pz->names[pz->cur] : "YOU"; }
+static const char *bname(void) { return pz->bot[0] ? pz->bot : "PICO"; }
 static uc tok_i, tok_o, last_tn;
 static char b[34];
 static void draw_clock(void) { wp = b; a_t(); *wp = 0; text_at(21, 24, b, INV); }
@@ -148,17 +140,33 @@ static uc key_in(void) {
     lastk = k;
     return k;
 }
+/* ---- input line: IN_ROWS rows starting at in0 ---- */
+static uc idle_limit, idle_n;               /* idle question: seconds without a key, and the function to call */
+static void (*idle_fn)(void);
+static void header(const char *who, uc tok, uc with_time);
+static void check_rem(void) {
+    if (pz->rem_on && hh == pz->rem_h && mm == pz->rem_m) {
+        pz->rem_on = 0;
+        wp = b; a_s("REMINDER "); a_t(); *wp = 0; chat_line(b, INV);
+        chat_text(pz->rem_txt[0] ? pz->rem_txt : "TIME IS UP!");
+        draw_status("REMINDER!");
+    }
+}
+static void tick_ui(void) {
+    if (tick_clock()) {
+        draw_clock(); check_rem();
+        if (idle_fn && ++idle_n >= idle_limit) { idle_n = 0; idle_fn(); }
+    }
+}
 static uc ask_yn(void) {                    /* waits for Y or N */
     uc k;
     for (;;) {
-        if (tick_clock()) draw_clock();
+        tick_ui();
         k = key_in();
         if (k == 'Y') return 1;
         if (k == 'N') return 0;
     }
 }
-
-/* ---- input line: IN_ROWS rows starting at in0 ---- */
 static uc in0 = 17, inrows = 4;
 static void clear_input(void) { uc i; for (i = 0; i < inrows; i++) fillr(in0 + i, 0); }
 static void draw_input(const char *buf, uc n) {
@@ -172,9 +180,10 @@ static void read_line(char *buf, uc max) {
     uc n = 0, k;
     buf[0] = 0; draw_input(buf, 0);
     for (;;) {
-        if (tick_clock()) draw_clock();
+        tick_ui();
         k = key_in();
         if (!k) continue;
+        idle_n = 0;
         if (k == 13) break;
         if (k == 12) { if (n) n--; }
         else if (k >= 27 && k <= 30) { temperature = pz->temp = k - 26; draw_status("READY"); }
@@ -196,14 +205,15 @@ static void request(uc code, const char *carry) {
     strncpy(pz->carry, carry, 47); pz->carry[47] = 0;
     quit = 1;
 }
-static uc has(const char *h, const char *n) {   /* case-insensitive substring test */
+static int find(const char *h, const char *n) {   /* case-insensitive substring search: index or -1 */
     uc i, j;
     for (i = 0; h[i]; i++) {
         for (j = 0; n[j]; j++) { uc c = h[i + j]; if (c >= 'a' && c <= 'z') c -= 32; if (c != n[j]) break; }
-        if (!n[j]) return 1;
+        if (!n[j]) return i;
     }
-    return 0;
+    return -1;
 }
+#define has(h, n) (find(h, n) >= 0)
 static void clock_boot(void) {              /* ask for the time only when the persistent zone has none */
     static char t[6];
     lastf = frames();

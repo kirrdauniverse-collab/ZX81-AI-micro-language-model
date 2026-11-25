@@ -2,10 +2,12 @@
 #include <string.h>
 typedef unsigned char u8;
 typedef unsigned int uc;
-static uc has(const char *h, const char *n) { uc i, j; for (i = 0; h[i]; i++) { for (j = 0; n[j]; j++) { uc c = h[i + j]; if (c >= 'a' && c <= 'z') c -= 32; if (c != n[j]) break; } if (!n[j]) return 1; } return 0; }
+static int find(const char *h, const char *n) { uc i, j; for (i = 0; h[i]; i++) { for (j = 0; n[j]; j++) { uc c = h[i + j]; if (c >= 'a' && c <= 'z') c -= 32; if (c != n[j]) break; } if (!n[j]) return i; } return -1; }
+#define has(h, n) (find(h, n) >= 0)
+static uc has_old(const char *h, const char *n) { uc i, j; for (i = 0; h[i]; i++) { for (j = 0; n[j]; j++) { uc c = h[i + j]; if (c >= 'a' && c <= 'z') c -= 32; if (c != n[j]) break; } if (!n[j]) return 1; } return 0; }
 #include "draw_core.c"
 int main(void) {
-    const char *cmds[] = {"draw a circle left", "draw a box next to it", "draw a small triangle right bottom", "bigger", "draw a line", "draw a house", 0};
+    const char *cmds[] = {"draw a big house on the left", "draw a car next to the house", "draw a tree right of the car", "draw the sun above the house", "draw jupiter small bottom right", "draw a circle", 0};
     uc k, r, c, m, bad = 0; u8 out[512];
     for (k = 0; cmds[k]; k++) {
         cmd(cmds[k], 10 + k * 7);

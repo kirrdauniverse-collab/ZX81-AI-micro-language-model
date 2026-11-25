@@ -3,6 +3,7 @@
 void pico_reply(const char *line, unsigned int sd);
 extern char rbuf[];
 extern unsigned char temperature;
+void think_cb(unsigned int a, unsigned int b, unsigned int c) {}
 int main(int argc, char **argv) {
     char buf[128]; unsigned int sd = 7;
     if (argc > 1) temperature = argv[1][0] - '0';
