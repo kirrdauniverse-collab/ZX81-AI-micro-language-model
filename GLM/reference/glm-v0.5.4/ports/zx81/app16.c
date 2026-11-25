@@ -61,7 +61,7 @@
 #define TABLE_NAMES 14          /* + RT-BASE16 in slot 0 */
 
 /* ---- state v2: 72 bytes packed 3 -> 4 into 96 cells (rows 0-2) ----
- *  0-2  'R','T','2'   3  version   4-11 name   12 gender 'f'/'n'
+ *  Hidden RAM at $7A30: raw 72-byte state (survives short topic LOADs)
  *  13  year-2000      14-15 stamp (days since 2000, BE)
  *  16  hour           17  min       18-25 hist  26  hist_n
  *  27-30 seed         31  topic     32  pending 33  temp 1-4
