@@ -211,7 +211,7 @@ def boot_input_program():
     # The cassette LOAD leaves video disabled; SLOW must run BEFORE the
     # first PRINT/INPUT or the screen rolls while the wizard is active.
     lines = [
-        boot_basic_line(2, b"\\xE4"),
+        boot_basic_line(2, b"\xE4"),
         boot_print_line(3, "PIOCO AI PROFILE"),
         boot_print_line(4, "YEAR"),
         boot_input_line(5, "Y"),
