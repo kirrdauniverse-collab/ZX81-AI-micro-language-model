@@ -31,6 +31,8 @@ int hal_tape_save(int index, const rt_u8 *buf, long len);
 int  hal_getchar(void);
 int  hal_kbhit(void);
 void hal_putchar(int c);
+void hal_console_reset(void);
+void hal_console_char_at(long cell, char c);
 void hal_flush(void);
 void hal_msleep(long ms);
 
