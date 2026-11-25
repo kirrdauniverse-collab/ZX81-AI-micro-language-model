@@ -37,7 +37,7 @@ if __name__ == "__main__":
     if len(items) != 15 or items[0][0] != "RTBOOT01" or items[1][0] != "RTBASE16":
         raise SystemExit(f"expected BOOT + BASE + 13 topics, got {len(items)}")
 
-    if b.SCRATCH_BASE != 0x7A30 or b.SCRATCH_BASE + 72 + 128 > b.DFILE:
+    if b.SCRATCH_BASE != 0x7A72 or b.SCRATCH_BASE + 72 + 64 > b.DFILE:
         raise SystemExit("hidden state/ring RAM layout overlaps D_FILE")
     for name, image in items[1:]:
         if b.Z + len(image) > b.SCRATCH_BASE:
