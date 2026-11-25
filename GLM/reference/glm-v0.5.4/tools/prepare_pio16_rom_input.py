@@ -206,32 +206,34 @@ def boot_input_line(number, letter, string_value=False):
     return boot_basic_line(number, b"\xEE" + variable)  # ROM INPUT token
 
 
-def boot_input_program():
-    # First turn on the real ZX81 SLOW display using the ROM token $E4.
-    # The cassette LOAD leaves video disabled; SLOW must run BEFORE the
-    # first PRINT/INPUT or the screen rolls while the wizard is active.
+def boot_input_program(code):
+    # A BASIC SLOW token assumes IY=$4000. A tape quickload can leave IY
+    # containing an arbitrary value, so establish the ROM register base
+    # through a tiny USR stub BEFORE the first ROM SLOW/INPUT operation.
+    stub_addr = CODE_ORG + len(code)
+    number = zx_digits(stub_addr) + b"\x7E" + zx_fp(stub_addr)
+    one = b"\x7E" + zx_fp(1)
+    prompt = b"\xFA\xD4" + number + b"\x14\x1D" + one + b"\xDE\xF5\x0B"
+    prompt += zx_text_codes("PIOCO AI PROFILE") + b"\x0B"
     lines = [
-        boot_basic_line(2, b"\xE4"),
-        boot_print_line(3, "PIOCO AI PROFILE"),
-        boot_print_line(4, "YEAR"),
-        boot_input_line(5, "Y"),
-        boot_print_line(6, "MONTH"),
-        boot_input_line(7, "M"),
-        boot_print_line(8, "DAY"),
-        boot_input_line(9, "D"),
-        boot_print_line(10, "HOUR"),
-        boot_input_line(11, "H"),
-        boot_print_line(12, "MINUTE"),
-        boot_input_line(13, "N"),
-        boot_print_line(14, "NAME"),
-        boot_input_line(15, "A", True),
-        boot_print_line(16, "GENDER F/N"),
-        boot_input_line(17, "G", True),
+        boot_basic_line(2, prompt),
+        boot_print_line(3, "YEAR"),
+        boot_input_line(4, "Y"),
+        boot_print_line(5, "MONTH"),
+        boot_input_line(6, "M"),
+        boot_print_line(7, "DAY"),
+        boot_input_line(8, "D"),
+        boot_print_line(9, "HOUR"),
+        boot_input_line(10, "H"),
+        boot_print_line(11, "MINUTE"),
+        boot_input_line(12, "N"),
+        boot_print_line(13, "NAME"),
+        boot_input_line(14, "A", True),
+        boot_print_line(15, "GENDER F/N"),
+        boot_input_line(16, "G", True),
     ]
-    # usrlines() returns a complete numbered BASIC line. Extract just its
-    # token body and rebuild it as line 18, after the seven ROM INPUTs.
     load_body = usrlines("RTBASE16", False)[4:-1]
-    lines.append(boot_basic_line(18, load_body))
+    lines.append(boot_basic_line(17, load_body))
     return lines
 
 '''
@@ -243,8 +245,12 @@ if "def boot_input_program():" not in s:
     s = s.replace(marker, helper + marker, 1)
 old = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76",
              usrlines("RTBASE16", False)]'''
-new = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76"] + boot_input_program()'''
+new = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76"] + boot_input_program(code)'''
 s = replace_once(s, old, new, "boot ROM INPUT line sequence")
+s = replace_once(s,
+    '    body1 = b"\\xEA" + code',
+    '    body1 = b"\\xEA" + code + bytes.fromhex("FD 21 00 40 CD 2B 0F 21 01 00 C9")',
+    "pre-INPUT IY/SLOW bootstrap stub")
 write(p, s)
 
 print("PIOCO 16K ROM INPUT preparation: PASS")
