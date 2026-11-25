@@ -35,6 +35,7 @@ jobs:
           print("ROM INPUT prompt layout: PASS (label and INPUT share one row)")
           PY
           python3 tools/test_zx81_fp_profile.py
+          python3 tools/test_zx81_hidden_storage.py
           DEFS="-DZX81_RAMTOP_LAYOUT -DRT_MAX_VOCAB=48 -DRT_MAX_CTX=8 -DRT_MAX_EMB=4 -DRT_MAX_HID=8 -DRT_APP_MODEL_MAX=1100 -DRT_MEM_MAX=6 -DRT_JOURNAL_MAX=8 -DRT_LINE_MAX=64"
           docker pull z88dk/z88dk:latest
           docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src/GLM/reference/glm-v0.5.4 z88dk/z88dk:latest zcc +zx81 -vn -O3 -m -zorg=16514 -create-app $DEFS -Iengine -Iports/zx81 -o build/zx81/rtchat16 ports/zx81/hal_zx81.c ports/zx81/app16.c ports/zx81/intent16.c engine/rt_charset.c engine/rt_model.c engine/rt_engine.c engine/rt_chat.c
