@@ -324,7 +324,7 @@ pkn1:
 #endasm
 }
 
-/* ---- the scrollback page: the ring -> display rows 8-15 ---- */
+/* ---- the scrollback page: four hidden ring rows -> console rows 8-11 ---- */
 
 static void page_show(void)
 {
@@ -332,7 +332,7 @@ static void page_show(void)
     char row[33];
 
     row[32] = 0;
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < 4; i++) {
         int base = (ring_pos / 32) * 32;   /* the oldest row first */
         int src = (base + i * 32) % RING_CELLS;
 
@@ -342,7 +342,7 @@ static void page_show(void)
             row[c] = RT_CHARSET[v < RT_CHARSET_LEN ? v : 0];
         }
         for (c = 0; c < 32; c++)
-            hal_scratch_char((8 + i) * 32 + c, row[c]);
+            hal_console_char_at((8 + i) * 32 + c, row[c]);
     }
 }
 
@@ -494,6 +494,7 @@ int main(void)
     call $0F2B           ; SLOW: enable the continuous NMI display
 #endasm
 
+    hal_console_reset();
     rt_charset_init();
 
     /* Initialize the chat engine before restoring the saved profile.
