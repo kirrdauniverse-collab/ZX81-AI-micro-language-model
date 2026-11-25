@@ -208,7 +208,7 @@ def build_image(code, model, tag_idx, tag_name, load_name, with_save):
     model + tag + name table, ending right below the D-file zone.
     Everything the ROM's LOAD-chain touches; the display file above
     stays untouched so the packed state rows survive block swaps."""
-    body1 = b"\xEA" + code
+    body1 = b"\xEA" + code + bytes.fromhex("FD 21 00 40 CD 2B 0F 21 01 00 C9")
     l1 = len(body1) + 1
     lines = [be16(1) + le16(l1) + body1 + b"\x76",
              usrlines(load_name, with_save)]
