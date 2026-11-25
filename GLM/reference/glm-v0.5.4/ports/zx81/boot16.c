@@ -246,10 +246,11 @@ void main(void)
 {
     int i;
 
-#asm
-    ld ix, $4000
-    call $0F2B
-#endasm
+/* Do not call the ROM SLOW routine here.
+     * Z88DK's startup=2 CRT0 has already installed its ZX81 alternate
+     * NMI/display handler and placed that handler address in IY.
+     * Replacing IY with $4000 here destroys the handler and causes
+     * the diagonal/rolling display seen after profile acceptance. */
 
     if (!read_profile_from_rom_input()) {
         say("PROFILE DATA ERROR\n");
