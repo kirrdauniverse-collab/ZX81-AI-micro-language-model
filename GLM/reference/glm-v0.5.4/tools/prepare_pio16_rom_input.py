@@ -247,14 +247,12 @@ old = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76",
              usrlines("RTBASE16", False)]'''
 new = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76"] + boot_input_program(code)'''
 s = replace_once(s, old, new, "boot ROM INPUT line sequence")
-body_line = '    body1 = b"' + chr(92) + 'xEA" + code'
-stub_expr = 'bytes.fromhex("FD 21 00 40 CD 2B 0F 01 01 00 C9")'
-if stub_expr not in s:
-    if body_line not in s:
-        raise SystemExit("build_boot body1 source line not found")
-    s = s.replace(body_line, body_line + " + " + stub_expr, 1)
-if body_line + " + " + stub_expr not in s:
-    raise SystemExit("pre-INPUT IY/SLOW stub was not added to build_boot")
+build_boot_part = s.split("def build_boot(code):", 1)[1]
+expected_stub = 'bytes.fromhex("FD 21 00 40 CD 2B 0F 01 01 00 C9")'
+if expected_stub not in build_boot_part:
+    raise SystemExit("BOOT block lacks the IY/SLOW stub with BC=1 return")
+if expected_stub in s.split("def build_boot(code):", 1)[0]:
+    raise SystemExit("IY/SLOW boot stub was incorrectly attached to chat topic images")
 
 write(p, s)
 
