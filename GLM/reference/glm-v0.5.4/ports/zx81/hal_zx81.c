@@ -228,8 +228,8 @@ rt_u32 hal_entropy(void)
  * before D_FILE. These bytes are ordinary RAM, not display cells, so
  * the ROM video generator never renders them. Build asserts that every
  * topic image ends below $7A30; this ring occupies $7A78-$7AF7. */
-#define ZX81_RING_BASE  0x7A78
-#define ZX81_RING_CELLS 128
+#define ZX81_RING_BASE  0x7ABA
+#define ZX81_RING_CELLS 64
 
 rt_u8 hal_scratch_get(long i)
 {
