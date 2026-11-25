@@ -279,6 +279,12 @@ if expected_stub not in build_boot_part:
 if expected_stub in s.split("def build_boot(code):", 1)[0]:
     raise SystemExit("IY/SLOW boot stub was incorrectly attached to chat topic images")
 
+# Line byte lengths are already stored dynamically by boot_basic_line() and
+# usrlines(). Drop the old 33-byte assertions, which belong to the prior
+# fixed prompt layout and are not needed for the ROM's variable line lengths.
+s = s.replace("    assert len(l2) == 33\\n", "")
+s = s.replace("        assert len(l3) == 33\\n", "")
+
 write(p, s)
 
 print("PIOCO 16K ROM INPUT preparation: PASS")
