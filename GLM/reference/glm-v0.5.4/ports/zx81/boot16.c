@@ -167,7 +167,7 @@ static void pack_profile(void)
 {
     int i;
     rt_u8 x = 0;
-    rt_u8 *dst = (rt_u8 *)0x7A30;
+    rt_u8 *dst = (rt_u8 *)0x7A72;
 
     for (i = 0; i < ST_BYTES; i++)
         buf[i] = 0;
@@ -189,7 +189,7 @@ static void pack_profile(void)
         x = (rt_u8)(x ^ buf[i]);
     buf[ST_BYTES - 1] = x;
 
-    /* Hidden RAM gap: the BASE16 image ends below $7A30, so LOAD
+    /* Hidden RAM gap: the BASE16 image ends below $7A72, so LOAD
      * preserves this profile without writing binary glyphs to D_FILE. */
     for (i = 0; i < ST_BYTES; i++)
         dst[i] = buf[i];
