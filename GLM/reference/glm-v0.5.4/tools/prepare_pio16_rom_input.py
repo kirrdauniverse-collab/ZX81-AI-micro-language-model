@@ -215,7 +215,7 @@ def boot_basic_line(number, body):
 
 
 def boot_print_line(number, text):
-    return boot_basic_line(number, b"\xF5\x0B" + zx_text_codes(text) + b"\x0B")
+    return boot_basic_line(number, b"\xF5\x0B" + zx_text_codes(text) + b"\x0B\x19")
 
 
 def boot_input_line(number, letter, string_value=False):
