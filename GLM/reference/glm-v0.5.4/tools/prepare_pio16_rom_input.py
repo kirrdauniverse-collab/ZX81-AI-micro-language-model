@@ -251,7 +251,13 @@ def boot_input_program(code):
         boot_print_line(15, "GENDER F/N"),
         boot_input_line(16, "G", True),
     ]
-    load_body = usrlines("RTBASE16", False)[4:-1]
+    load_body = (
+        b"\xFA\xD4" + zx_digits(CODE_ORG) + b"\x7E" + zx_fp(CODE_ORG) +
+        b"\x14\x1D" + b"\x7E" + zx_fp(1) +
+        b"\xDE\xEF\x0B" + zx_name("RTBASE16") + b"\x0B"
+    )
+    if len(load_body) != 33:
+        raise ValueError("BOOT LOAD line length is %d, expected 33" % len(load_body))
     lines.append(boot_basic_line(17, load_body))
     return lines
 
