@@ -25,6 +25,18 @@ jobs:
           MODEL
           base64 -d build/zx81/english8_qat_g2.bin.b64 > models16_v05_en/english8_qat_g2.bin
           python3 tools/prepare_pio16_rom_input.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("tools/t81build16.py")
+          s = p.read_text()
+          old = 'return boot_basic_line(number, b"\\\\xF5\\\\x0B" + zx_text_codes(text) + b"\\\\x0B")'
+          new = 'return boot_basic_line(number, b"\\\\xF5\\\\x0B" + zx_text_codes(text) + b"\\\\x0B\\\\x19")  # keep next INPUT on same screen row'
+          if old not in s:
+              raise SystemExit("Could not find boot PRINT line builder for same-row INPUT fix")
+          p.write_text(s.replace(old, new, 1))
+          assert new in p.read_text()
+          print("ROM INPUT prompt layout: PASS (label and INPUT share one row)")
+          PY
           python3 tools/test_zx81_fp_profile.py
           DEFS="-DZX81_RAMTOP_LAYOUT -DRT_MAX_VOCAB=48 -DRT_MAX_CTX=8 -DRT_MAX_EMB=4 -DRT_MAX_HID=8 -DRT_APP_MODEL_MAX=1100 -DRT_MEM_MAX=6 -DRT_JOURNAL_MAX=8 -DRT_LINE_MAX=64"
           docker pull z88dk/z88dk:latest
