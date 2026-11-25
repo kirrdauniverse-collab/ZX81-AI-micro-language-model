@@ -28,13 +28,10 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p = Path("tools/t81build16.py")
-          s = p.read_text()
-          marker = ' + b"' + chr(92) + 'x0B")'
-          replacement = ' + b"' + chr(92) + 'x0B' + chr(92) + 'x19")'
-          if marker not in s:
-              raise SystemExit("Could not find boot PRINT close-quote byte")
-          p.write_text(s.replace(marker, replacement, 1))
-          assert replacement in p.read_text()
+          lines = p.read_text().splitlines()
+          line = next((x for x in lines if "return boot_basic_line(number, b" in x), "")
+          if not line or chr(92) + "x19" not in line:
+              raise SystemExit("BASIC prompt labels do not keep INPUT on the same screen row")
           print("ROM INPUT prompt layout: PASS (label and INPUT share one row)")
           PY
           python3 tools/test_zx81_fp_profile.py
