@@ -105,8 +105,8 @@ static unsigned int now;       /* days since 2000, from the profile */
  * 5 rows of 32, packed (display codes are 0x00-0x3F so 6 bits are
  * enough). Lives INSIDE the display file, so an editor shift moves it
  * with everything else and it costs no separate RAM. */
-#define RING_CELLS 128
-#define RING_BASE  0                /* hidden RAM ring at $7A78 */
+#define RING_CELLS 64
+#define RING_BASE  0                /* hidden RAM ring at $7ABA */
 
 static rt_u8 topic_idx;        /* 0 = base, 1..13 = topic */
 static rt_u8 pending;          /* topic requested via /topic */
@@ -150,12 +150,12 @@ static void pack_state(void)
     /* Persist the 72-byte session record in the hidden scratch gap.
      * This is deliberately NOT written into D_FILE: those bytes are
      * fetched by the ZX81 video generator and would appear as garbage. */
-    memcpy((void *)0x7A30, b, ST_BYTES);
+    memcpy((void *)0x7A72, b, ST_BYTES);
 }
 
 static void unpack_state(void)
 {
-    memcpy(b, (const void *)0x7A30, ST_BYTES);
+    memcpy(b, (const void *)0x7A72, ST_BYTES);
 }
 
 static int state_valid(void)
@@ -324,7 +324,7 @@ pkn1:
 #endasm
 }
 
-/* ---- the scrollback page: four hidden ring rows -> console rows 8-11 ---- */
+/* ---- the scrollback page: two hidden ring rows -> console rows 8-9 ---- */
 
 static void page_show(void)
 {
@@ -332,7 +332,7 @@ static void page_show(void)
     char row[33];
 
     row[32] = 0;
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < 2; i++) {
         int base = (ring_pos / 32) * 32;   /* the oldest row first */
         int src = (base + i * 32) % RING_CELLS;
 
