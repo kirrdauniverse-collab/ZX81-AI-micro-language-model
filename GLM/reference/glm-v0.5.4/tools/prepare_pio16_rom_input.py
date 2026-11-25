@@ -248,7 +248,7 @@ old = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76",
 new = '''    lines = [be16(1) + le16(l1) + body1 + b"\\x76"] + boot_input_program(code)'''
 s = replace_once(s, old, new, "boot ROM INPUT line sequence")
 body_line = '    body1 = b"' + chr(92) + 'xEA" + code'
-stub_expr = 'bytes.fromhex("FD 21 00 40 CD 2B 0F 21 01 00 C9")'
+stub_expr = 'bytes.fromhex("FD 21 00 40 CD 2B 0F 01 01 00 C9")'
 if stub_expr not in s:
     if body_line not in s:
         raise SystemExit("build_boot body1 source line not found")
