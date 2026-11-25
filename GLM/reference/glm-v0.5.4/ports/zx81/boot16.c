@@ -126,7 +126,7 @@ static int read_basic_number(char letter, int *value)
            ((unsigned long)p[2] << 16) |
            ((unsigned long)p[3] << 8) |
            (unsigned long)p[4];
-    shift = 160 - (int)p[0];
+    shift = 159 - (int)p[0];  /* mantissa is a 31-bit fraction */
     if (shift >= 32)
         v = 0;
     else if (shift > 0)
