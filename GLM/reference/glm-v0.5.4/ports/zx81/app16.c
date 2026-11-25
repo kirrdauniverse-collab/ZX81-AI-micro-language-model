@@ -105,8 +105,8 @@ static unsigned int now;       /* days since 2000, from the profile */
  * 5 rows of 32, packed (display codes are 0x00-0x3F so 6 bits are
  * enough). Lives INSIDE the display file, so an editor shift moves it
  * with everything else and it costs no separate RAM. */
-#define RING_CELLS 160
-#define RING_BASE  96               /* cell 96 = row 3, col 0 */
+#define RING_CELLS 128
+#define RING_BASE  0                /* hidden RAM ring at $7A78 */
 
 static rt_u8 topic_idx;        /* 0 = base, 1..13 = topic */
 static rt_u8 pending;          /* topic requested via /topic */
@@ -147,147 +147,15 @@ static void say_int(int v)
 
 static void pack_state(void)
 {
-#asm
-    ld    hl,($400C)
-    inc   hl              ; HL = the first cell of row 0
-    ld    de,_b           ; DE = the source b[0..71]
-    ld    a,3             ; 3 work rows
-ps_row:
-    ld    b,8             ; 8 groups of 3 -> 4 per row
-    push  af
-ps_grp:
-    push  bc              ; the group counter
-    ld    a,(de)
-    ld    c,a             ; C = b0
-    inc   de
-    ld    a,(de)
-    ld    b,a             ; B = b1
-    inc   de
-    ld    a,(de)
-    inc   de
-    push  af              ; b2 for cell2
-    push  af              ; b2 for cell3
-    ld    a,c             ; cell0 = b0 & $3F
-    and   $3F
-    ld    (hl),a
-    inc   hl
-    ld    a,c             ; cell1 = (b0>>6) | ((b1&0F)<<2)
-    and   $C0
-    rlca                  ; bits 6-7 -> bits 0-1
-    rlca
-    ld    c,a
-    ld    a,b
-    and   $0F
-    add   a,a
-    add   a,a
-    or    c
-    ld    (hl),a
-    inc   hl
-    ld    a,b             ; cell2 = ((b1>>4)&$0F) | ((b2&3)<<4)
-    and   $F0
-    rrca
-    rrca
-    rrca
-    rrca
-    ld    c,a
-    pop   af              ; b2
-    and   $03
-    add   a,a
-    add   a,a
-    add   a,a
-    add   a,a
-    or    c
-    ld    (hl),a
-    inc   hl
-    pop   af              ; b2
-    srl   a               ; cell3 = b2 >> 2
-    srl   a
-    ld    (hl),a
-    inc   hl
-    pop   bc
-    djnz  ps_grp
-    inc   hl              ; skip the row terminator ($76)
-    pop   af
-    dec   a
-    jr    nz,ps_row
-    ret
-#endasm
+    /* Persist the 72-byte session record in the hidden scratch gap.
+     * This is deliberately NOT written into D_FILE: those bytes are
+     * fetched by the ZX81 video generator and would appear as garbage. */
+    memcpy((void *)0x7A30, b, ST_BYTES);
 }
 
 static void unpack_state(void)
 {
-#asm
-    ld    hl,($400C)
-    inc   hl              ; HL = the first cell of row 0 (the source)
-    ld    de,_b           ; DE = the target b[0..71] - NEVER clobbered
-    ld    a,3             ; 3 work rows
-pu_row:
-    ld    b,8             ; 8 groups per row
-    push  af
-pu_grp:
-    push  bc              ; the group counter waits on the stack, so
-                          ; B and C are free as cell temporaries
-    ld    a,(hl)          ; cell0
-    inc   hl
-    and   $3F
-    ld    c,a             ; C = cell0
-    ld    a,(hl)          ; cell1
-    inc   hl
-    and   $3F
-    ld    b,a             ; B = cell1
-    ld    a,(hl)          ; cell2
-    inc   hl
-    and   $3F
-    push  af              ; cell2 on the stack
-    ld    a,(hl)          ; cell3
-    inc   hl
-    and   $3F
-    push  af              ; cell3 on the stack
-    ; b0 = cell0 | (cell1&3)<<6
-    ld    a,b
-    and   $03
-    rrca
-    rrca
-    or    c
-    ld    (de),a
-    inc   de
-    ; b1 = (cell1>>2)&0F | (cell2&0F)<<4
-    ld    a,b
-    and   $3C
-    rrca
-    rrca
-    ld    c,a
-    pop   af              ; cell2
-    and   $0F
-    add   a,a
-    add   a,a
-    add   a,a
-    add   a,a
-    or    c
-    ld    (de),a
-    inc   de
-    ; b2 = (cell2>>4)&3 | cell3<<2
-    pop   af              ; cell2 again
-    and   $30
-    rrca
-    rrca
-    rrca
-    rrca
-    ld    c,a
-    pop   af              ; cell3
-    add   a,a
-    add   a,a
-    or    c
-    ld    (de),a
-    inc   de
-    pop   bc
-    djnz  pu_grp
-    inc   hl              ; skip the row terminator ($76)
-    pop   af
-    dec   a
-    jr    nz,pu_row
-    ret
-#endasm
+    memcpy(b, (const void *)0x7A30, ST_BYTES);
 }
 
 static int state_valid(void)
