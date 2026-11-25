@@ -165,8 +165,9 @@ static int read_basic_string(char letter, char *out, int maxlen)
 
 static void pack_profile(void)
 {
-    int c, i;
+    int i;
     rt_u8 x = 0;
+    rt_u8 *dst = (rt_u8 *)0x7A30;
 
     for (i = 0; i < ST_BYTES; i++)
         buf[i] = 0;
@@ -188,15 +189,10 @@ static void pack_profile(void)
         x = (rt_u8)(x ^ buf[i]);
     buf[ST_BYTES - 1] = x;
 
-    for (c = 0; c < 24; c++) {
-        rt_u8 b0 = buf[c * 3], b1 = buf[c * 3 + 1], b2 = buf[c * 3 + 2];
-        hal_scratch_put(c * 4 + 0, b0 & 0x3F);
-        hal_scratch_put(c * 4 + 1,
-                        (rt_u8)((b0 >> 6) | ((b1 & 0x0F) << 2)));
-        hal_scratch_put(c * 4 + 2,
-                        (rt_u8)(((b1 >> 4) & 0x0F) | ((b2 & 0x03) << 4)));
-        hal_scratch_put(c * 4 + 3, b2 >> 2);
-    }
+    /* Hidden RAM gap: the BASE16 image ends below $7A30, so LOAD
+     * preserves this profile without writing binary glyphs to D_FILE. */
+    for (i = 0; i < ST_BYTES; i++)
+        dst[i] = buf[i];
 }
 
 static int read_profile_from_rom_input(void)
@@ -258,7 +254,9 @@ void main(void)
         return 0;
     }
 
-    say("\nPIOCO AI PROFILE OK\n");
+    pack_profile();
+    hal_console_reset();
+    say("PIOCO AI PROFILE OK\n");
     say("WELCOME ");
     for (i = 0; i < 8 && bname[i]; i++)
         hal_putchar(bname[i]);
@@ -272,7 +270,6 @@ void main(void)
         hal_putchar('0');
     say_int(bmin);
     say("\n");
-    pack_profile();
     say("PROFILE SAVED IN MEMORY\n");
     say("REWIND TAPE TO RTBASE16\n");
     return 1;
