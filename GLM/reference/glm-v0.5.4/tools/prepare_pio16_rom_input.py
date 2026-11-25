@@ -75,6 +75,25 @@ app = app.replace("#define K_PAGEDOWN 0x1F    /* SHIFT+0 */",
                   "#define K_PAGEDOWN 0x1F    /* SHIFT+7 */")
 app = app.replace("#define K_RUBOUT   8       /* SHIFT+5: ZX81 RUBOUT (ASCII backspace) */",
                   "#define K_RUBOUT   8       /* SHIFT+5: ZX81 RUBOUT (ASCII backspace) */")
+raw_slow = """    /* v0.5.4: same display re-assert as the boot (see boot16.c): after
+     * the ROM's LOAD (multiload chain) or a quickload entry the NMI
+     * display must be re-enabled, else only getk()'s keyboard scans
+     * regenerate the picture. */
+#asm
+    ; -IXIY swap: assembles as LD IY,4000h = the ROM sysvar base
+    ld ix, $4000
+    call $0F2B           ; SLOW: enable the continuous NMI display
+#endasm
+
+"""
+app = replace_once(app, raw_slow,
+    """    /* CRT0 startup=2 already installs the alternate ZX81 NMI handler.
+     * Do not overwrite its IY handler pointer with $4000 or call raw SLOW
+     * from main(), otherwise display synchronization is corrupted. */
+
+""", "remove app raw SLOW/IY reset")
+if "call $0F2B" in app or "ld ix, $4000" in app:
+    raise SystemExit("app16 still contains a raw SLOW/IY reset")
 write("ports/zx81/app16.c", app)
 
 # The BASIC INPUT editor stores the user's name in a string variable.
