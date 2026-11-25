@@ -207,26 +207,31 @@ def boot_input_line(number, letter, string_value=False):
 
 
 def boot_input_program():
-    # PRINT labels followed by the ROM INPUT editor. No C-side key polling.
+    # First turn on the real ZX81 SLOW display using the ROM token $E4.
+    # The cassette LOAD leaves video disabled; SLOW must run BEFORE the
+    # first PRINT/INPUT or the screen rolls while the wizard is active.
     lines = [
-        boot_print_line(2, "PIOCO AI PROFILE"),
-        boot_print_line(3, "YEAR"),
-        boot_input_line(4, "Y"),
-        boot_print_line(5, "MONTH"),
-        boot_input_line(6, "M"),
-        boot_print_line(7, "DAY"),
-        boot_input_line(8, "D"),
-        boot_print_line(9, "HOUR"),
-        boot_input_line(10, "H"),
-        boot_print_line(11, "MINUTE"),
-        boot_input_line(12, "N"),
-        boot_print_line(13, "NAME"),
-        boot_input_line(14, "A", True),
-        boot_print_line(15, "GENDER F/N"),
-        boot_input_line(16, "G", True),
+        boot_basic_line(2, b"\\xE4"),
+        boot_print_line(3, "PIOCO AI PROFILE"),
+        boot_print_line(4, "YEAR"),
+        boot_input_line(5, "Y"),
+        boot_print_line(6, "MONTH"),
+        boot_input_line(7, "M"),
+        boot_print_line(8, "DAY"),
+        boot_input_line(9, "D"),
+        boot_print_line(10, "HOUR"),
+        boot_input_line(11, "H"),
+        boot_print_line(12, "MINUTE"),
+        boot_input_line(13, "N"),
+        boot_print_line(14, "NAME"),
+        boot_input_line(15, "A", True),
+        boot_print_line(16, "GENDER F/N"),
+        boot_input_line(17, "G", True),
     ]
-    load_line = usrlines("RTBASE16", False)
-    lines.append(be16(17) + load_line[2:])
+    # usrlines() returns a complete numbered BASIC line. Extract just its
+    # token body and rebuild it as line 18, after the seven ROM INPUTs.
+    load_body = usrlines("RTBASE16", False)[4:-1]
+    lines.append(boot_basic_line(18, load_body))
     return lines
 
 '''
