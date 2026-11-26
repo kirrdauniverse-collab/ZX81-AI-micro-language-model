@@ -1,0 +1,6 @@
+TÖRÖLHETŐ — ARCHIVED
+
+A korábbi GLM munkakönyvtár teljes tartalma változatlanul megőrizve lett a CHATGPT1/GLM alatt.
+Ezt a könyvtárat csak akkor töröld, ha a CHATGPT1 archívumot és az ERROR_AND_REPAIR_LOG.md fájlt ellenőrizted.
+
+Dátum: 2026-11-26

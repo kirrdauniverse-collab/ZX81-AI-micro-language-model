@@ -1,0 +1,21 @@
+
+retro-tinyllm v0.1 - tiny int8 chat models on 8/16-bit machines
+type /help for commands, or just chat. disk is the primary model
+source; tape variant loads via /load <n>.
+
+you> /greedy on
+greedy on
+you> /load 0
+topic loaded: vocab 45 ctx 10
+you> how much ram does the zx spectrum have?
+> the amiga 500 ins a mata.
+you> /load 1
+topic loaded: vocab 45 ctx 10
+you> what is the weather like?
+> today is cloudy outside my window.
+you> /load 2
+topic loaded: vocab 45 ctx 10
+you> what do rabbits do?
+> cethe cars?
+you> /quit
+bye!

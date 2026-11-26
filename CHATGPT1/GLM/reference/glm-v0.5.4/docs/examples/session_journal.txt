@@ -1,0 +1,20 @@
+
+retro-tinyllm v0.2 - tiny int8 chat models on 8/16-bit machines
+general model first; special topics load on demand, ambiguous
+words get a clarifying question. /help lists the commands.
+this machine has no clock, please tell me:
+date today (yyyy mm dd, or just enter to skip)? 2026 11 18
+time now (hh mm)? 19 30
+thanks! so it is wednesday, 2026-11-18 19:30 - a fine evening in autumn.
+
+good evening! autumn it is. i remember:
+  on monday (16.11.) you said: i am tired
+  on monday (16.11.) you said: my head hurts
+
+you> hello!
+> good evening!
+you> /journal
+2026-11-16 monday: my head hurts
+2026-11-16 monday: i am tired
+you> /quit
+saved memory and journal. bye!
