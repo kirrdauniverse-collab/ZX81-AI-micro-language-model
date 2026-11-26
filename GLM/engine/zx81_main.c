@@ -5,40 +5,30 @@ uc pico_count(const char *s);
 u8 *pico_ctx(void);
 uc pico_known(const char *w);
 const char *pico_word(uc id);
-extern const char *pico_alias;
+extern const char *pico_alias, *pico_bot;
 extern u8 temperature, ntok_in, ntok_out;
 extern char rbuf[];
 
 static void draw_static(void) {
     uc r;
     fillr(0, INV); text_at(0, 0, "PICO AI - ZX81 MICRO LLM V0.5", INV);
-    fillr(13, INV); text_at(13, 0, "MEMORY", INV);
+    fillr(13, INV); text_at(13, 0, "THINKING", INV);
     for (r = ST0; r <= 16; r++) fillr(r, 0);
     text_at(22, 0, "SHIFT+1..4 TEMP  SHIFT+0 DEL", 0);
 }
-static void store_context(void) {           /* bytes shown as hex cells: 28 + nibble is always a safe cell code */
-    u8 *x = pico_ctx(); uc i, v, k;
-    for (i = 0; i < 33; i++) {
-        v = i ? x[i - 1] : temperature;
-        k = i * 2;                          /* every cell is addressed per row so the 0x76 row ends stay intact */
-        *cell(ST0 + k / 32, k % 32) = 28 + (v >> 4);
-        k++;
-        *cell(ST0 + k / 32, k % 32) = 28 + (v & 15);
-    }
-}
 /* thinking bar (row 23): what the model sees, which sentence it picked, and how many words it can choose from at each step */
-void think_cb(uc ph, uc x, uc y) {
+void think_cb(uc ph, uc x, uc y) {             /* the thinking area (rows 14-16): what the model sees, its topic and the sentences it builds */
     uc id; u8 *c;
     wp = b;
     if (ph == 1) {
-        a_s("SEEN");
+        fillr(14, 0); fillr(15, 0); fillr(16, 0);
+        a_s("SEEN:");
         c = pico_ctx();
-        for (id = 2; id < 254 && wp < b + 16; id++)
+        for (id = 2; id < 254 && wp < b + 24; id++)
             if (c[id >> 3] & (1 << (id & 7))) { a_c(' '); a_s(pico_word(id)); }
-    } else if (ph == 2) { a_s("MATCH SCORE "); a_u(x); }
-    else { a_s("WORD "); a_u(x); a_s("  OPTIONS "); a_u(y); }
-    *wp = 0; if (wp - b > 32) b[32] = 0;
-    fillr(23, 0); text_at(23, 0, b, 0);
+        *wp = 0; text_at(14, 0, b, 0);
+    } else if (ph == 2) { a_s("TOPIC: "); if (x) a_s(pico_word(x)); else a_c('-'); *wp = 0; text_at(15, 0, b, 0); }
+    else { a_s("SENTENCES BUILT: "); a_u(x); *wp = 0; text_at(16, 0, b, 0); }
 }
 static void on_idle(void) {                  /* nobody typed for a while: ask something */
     header(bname(), 0, 0);
@@ -52,9 +42,9 @@ static const char kw[] =
     "+POEM VERSE|"
     "+PROGRAM CODE|"
     "RECIPE COOK|"
-    "SORT MEANS CALCULAT MY_NAME_IS CALL_ME CALL_YOU SET_TIME SET_DATE REMIND WHAT_DAY WHAT_DATE WHAT_TIME THE_DATE THE_TIME WHO_AM_I GREET";
+    "SORT MEANS CALCULAT MY_NAME_IS CALL_ME CALL_YOU SET_TIME SET_DATE REMIND WHAT_DAY WHAT_DATE WHAT_TIME THE_DATE THE_TIME";
 static const char *const pnames[6] = { "DRAW", "STORY", "POEM", "CODE", "FOOD", "UTIL" };
-static const char *const topics[6] = { "DRAWING", "STORY WRITING", "POEMS", "PROGRAMMING", "RECIPES", "TOOLS: TIME, DATE, NAMES, MATHS" };
+static const char *const topics[6] = { "DRAWING", "STORIES", "POEMS", "PROGRAMS", "RECIPES", "TOOLS (TIME, MATHS, NAMES)" };
 static const u8 pcodes[6] = { 1, 3, 4, 5, 7, 2 };
 static uc is_math(const char *l) {
     uc i, j;
@@ -91,13 +81,13 @@ static void answer(const char *q) {          /* run the model, time it, show the
     last_tn = (frames() - t0) / 5; tok_o = ntok_out;
     tick_clock();
     header(bname(), tok_o, 1); chat_text(rbuf);
-    store_context(); draw_status("READY");
+    draw_status("READY");
 }
 static char line[124];
 int main(void) {
     uc code;
     pz_init();
-    pico_alias = pz->learn[0];
+    pico_alias = pz->learn[0]; pico_bot = pz->bot;
     if (!pz_ok) { scr_init(); text_at(10, 0, "RUN THE LOADER FIRST (RAMTOP)", 0); for (;;) ; }
     scr_init(); draw_static();
     clock_boot();
@@ -111,7 +101,6 @@ int main(void) {
         header(uname(), tok_i, 0); chat_text(line);
         code = wants(line);
         if (code) {                          /* a skill that lives in its own pack */
-            if (!pz_ok) { header(bname(), 0, 0); chat_text("I CANNOT LOAD PACKS: RAMTOP IS NOT SET. RUN THE LOADER FIRST."); continue; }
             header(bname(), 0, 0);
             chat_text("THAT IS A SEPARATE TOPIC:"); chat_text(topic);
             wp = b; a_s("LOAD THE "); a_s(packname); a_s(" PACK NOW? Y/N"); *wp = 0;

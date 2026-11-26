@@ -219,7 +219,7 @@ static void clock_boot(void) {              /* ask for the time only when the pe
     lastf = frames();
     if (pz->clk) return;
     draw_status("SET CLOCK");
-    chat_text("TYPE THE TIME AS HHMM (E.G. 1349) AND PRESS ENTER.");
+    chat_text("TIME HHMM? (E.G. 1349)");
     read_line(t, 4);
     if (t[3] >= '0' && t[3] <= '9') {
         hh = (t[0] - '0') * 10 + (t[1] - '0'); mm = (t[2] - '0') * 10 + (t[3] - '0');
@@ -228,3 +228,10 @@ static void clock_boot(void) {              /* ask for the time only when the pe
     }
     ss = 0; acc = 0; pz->clk = 1; pz_save();
 }
+
+/* the z88dk console output routine is never used: an empty stub keeps its character tables (about 350 bytes) out of the image */
+#asm
+    PUBLIC  fputc_cons_native
+fputc_cons_native:
+    ret
+#endasm

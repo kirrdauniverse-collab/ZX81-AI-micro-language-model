@@ -5,9 +5,8 @@ export ZCCCFG=${ZCCCFG:-/home/claude/z88src/z88dk/lib/config} PATH=${Z88DK_BIN:-
 FL="-O3 -Cc-unsigned -pragma-define:CRT_ENABLE_STDIO=0 -clib=default"
 REQ=32578                                   # PZ_ADDR ($7F40) + 2: the 'req' byte of the persistent zone
 ROUNDS=${ROUNDS:-5}
-MODEL_MAX=${MODEL_MAX:-2400}                # what is left for the dictionary after the code
 mkdir -p out out/real
-python3 tools/build_model.py knowledge/base.txt engine/model.h docs/knowledge-report.md $MODEL_MAX
+python3 tools/build_kb.py knowledge/kb.txt engine/kb.h docs/knowledge-report.md
 z88dk-zx81bas boot/loader_v05.bas && mv boot/loader_v05.p out/loader.P && rm -f boot/*.map boot/*.sym
 cd engine
 zcc +zx81 -vn $FL zx81_main.c pico.c -o /tmp/pico -create-app -m

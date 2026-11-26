@@ -11,6 +11,7 @@ def expand(name):
     t = open(os.path.join(E, name)).read()
     return re.sub(r'#include "([\w.]+\.c)"', lambda m: expand(m.group(1)), t)
 s = expand(main)
+s = re.sub(r'/\* the z88dk console output routine.*?#endasm\n', '', s, flags=re.S)
 s = re.sub(r'static void wait_frame\(void\) \{.*?\n\}\n', 'static void wait_frame(void) {}\n', s, flags=re.S)
 s = re.sub(r'/\* ---- keyboard.*?/\* ---- input line', 'static uc lastk; static uc key_in(void) { return 89; }\n/* ---- input line', s, flags=re.S)
 s = s.replace('dfile = (u8 *)*(uc *)16396;', 'dfile = host_df;').replace('*(uc *)16436', 'FAKE_F').replace('*(uc *)16388', 'PZ_ADDR').replace('(struct PZ *)PZ_ADDR', '&sim_pz')

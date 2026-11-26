@@ -13,7 +13,7 @@ p = 0x407D - 0x4009; last = 0
 while p < dfile - 0x4009:                       # walk the lines: find where the last one ends
     L = int.from_bytes(d[p + 2:p + 4], 'little'); ln = int.from_bytes(d[p:p + 2], 'big'); p += 4 + L; last = ln
 t = tempfile.mkdtemp(); bas = os.path.join(t, 'x.bas')
-open(bas, 'w').write(''.join('%d IF PEEK %s=%s THEN LOAD "%s"\n' % (10 * (i + 1), addr, c, n) for i, (c, n) in enumerate(reqs)))
+open(bas, 'w').write('10 LET N=PEEK %s\n' % addr + ''.join('%d IF N=%s THEN LOAD "%s"\n' % (10 * (i + 2), c, n) for i, (c, n) in enumerate(reqs)))
 subprocess.check_call(['z88dk-zx81bas', bas], stdout=subprocess.DEVNULL)
 s = open(os.path.join(t, 'x.p'), 'rb').read()
 sg = lambda a: int.from_bytes(s[a - 0x4009:a - 0x4009 + 2], 'little')

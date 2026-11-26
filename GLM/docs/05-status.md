@@ -1,4 +1,6 @@
-# Status v0.5 - base + six packs
+# Status v0.6 - base (fact-based sentence builder) + six packs
+
+v0.6: the base no longer stores sentences: see 08-knowledge-as-facts.md. Base 15.9 KB, 272 bytes free. Thinking area (rows 14-16) shows what Pico sees, its topic and the sentences it builds; idle question and taught words are back.
 
 ## Packs (each is a complete program: shared UI layer + its own skill; named blocks on the tape)
 | Block | What it does | Size |
