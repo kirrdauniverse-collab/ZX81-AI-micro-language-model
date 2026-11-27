@@ -718,7 +718,11 @@ GLM_PicoAI_v0.6.5_kazetta.T81 (MD5 1162414c907f7a0b13c5cc2b4999c0de, 227923 B):
   vonal párhuzamos vizsgálata: CHATGPT1/BREAKPOINT.md (AI16 vs R3) — nem keverendő.
 
 ### Következő menet
-1. GLM3 push (token vagy a felhasználó futtassa az útmutatót).
+1. ✓ MEGTÖRTÉNT (2026-11-27): a GLM3 könyvtár + a régi GLM/ TÖRÖLHETŐ-megerősítés
+   push-olva a GitHubra (762b1f4 → fa2345f, fast-forward; API-ellenőrzéssel:
+   GLM3/ 12 bejegyzéssel él, GLM/ jelzéssel). A push-token a sandbox
+   /home/z/my-project/.env GH_TOKEN mezőjében — a munka lezárása után ROTÁLANDÓ
+   (chatbe be volt illesztve).
 2. Re-vizsgálat a v0.6.5 alapfájlról: a $7AE0-csapda és az RTBASE16-lánc
    utasítás-szintű követése élő EO-ban, v0.9.2-vel összevetve.
 3. retro-tinyllm CI ("line1 is not REM"): külön vonal, a ChatGPT R5-builderét
