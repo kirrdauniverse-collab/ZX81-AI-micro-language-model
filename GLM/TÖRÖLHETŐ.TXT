@@ -4,3 +4,10 @@ A korábbi GLM munkakönyvtár teljes tartalma változatlanul megőrizve lett a 
 Ezt a könyvtárat csak akkor töröld, ha a CHATGPT1 archívumot és az ERROR_AND_REPAIR_LOG.md fájlt ellenőrizted.
 
 Dátum: 2026-11-26
+
+---
+GLM3-menet megerősítés (2026-11-27): a CHATGPT1/GLM másolat diff-szinten
+ellenőrizve — teljes, az egyetlen különbség ez a jelzőfájl maga. A jelenlegi
+GLM munkavonal (v0.6.5 → v0.9.2) a GLM3/ könyvtárban él (innen nézve ez a
+gyökér-GLM/ könyvtár a korábbi, v0.1–v0.4-es GLM-vonal archívuma).
+Ez a könyvtár nyugodtan törölhető.
