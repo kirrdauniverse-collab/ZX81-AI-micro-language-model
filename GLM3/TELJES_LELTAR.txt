@@ -1,10 +1,11 @@
 # GLM3 TELJES LELTAR (package_glm3.py --manifest)
 # meret_bajt  md5  relativ_ut
 
+       882  96830522935421b4bc98af467d10f900  ATKÖLTÖZTETVE.md
       7764  9481cb8e958ef38c64ba799fb4e3c343  HIBA_ES_JAVITAS_TORTENET.md
       3242  90245a4c2422a842f74102443c5406db  README.md
       4767  dfbba293701bf2522ae8267052766580  allapot/PROJECTLOG.md
-     41364  2505c146f8b7ffcf4f816d58e294579d  allapot/STATE.md
+     42931  643f8f7826988cdb2d1e97db602c50e0  allapot/STATE.md
      20477  1f755ece971bc1620b439bee01f77e5d  allapot/STATE_v0.7.1_backup.md
       3056  71edd687e21a2646cf3205c1dc3eee14  dokumentacio/GLM_PicoAI_v0.6.5_dokumentacio.txt
       1828  43965dcb5b46c7363c3dafb4ee8fa236  dokumentacio/GLM_PicoAI_v0.6.5_valtozasnaplo.txt
@@ -192,4 +193,4 @@
       5322  006bfb4ffe8a1a88ffbfa4fbf8c3a273  szkriptek/verify_v090.py
      11537  ce50da17054ea214ac4bad54d0507ae4  szkriptek/z80dis.py
   22194898  489d5f3f9eb32424aaec0fae70f9f39a  toolchain/GLM_z88dk_2.5_zx81_toolchain.tar.gz
-# OSSZ: 191 fajl, 30531173 bajt
+# OSSZ: 192 fajl, 30533622 bajt

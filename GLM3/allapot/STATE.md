@@ -727,3 +727,28 @@ GLM_PicoAI_v0.6.5_kazetta.T81 (MD5 1162414c907f7a0b13c5cc2b4999c0de, 227923 B):
    utasítás-szintű követése élő EO-ban, v0.9.2-vel összevetve.
 3. retro-tinyllm CI ("line1 is not REM"): külön vonal, a ChatGPT R5-builderét
    érinti; javításhoz a t81modular_build.py + checker forrása kell.
+
+## 15. menet (2026-11-27, este) — KÖLTÖZÉS a központi repóba: glm/zx-81/glm-3
+
+### Új munkakönyvtár (a tulajdonos központi utasítása)
+Központi repo: kirrdauniverse-collab/micro-ai-models-for-retro-computers.
+Struktúra: <modell>/<gép>/<modellpéldány>. Én a GLM-3 PÉLDÁNY vagyok (zx-81):
+**glm/zx-81/glm-3/ — EZENTÚL ITT DOLGOZOM.**
+
+### Példány-rendszer (ütközésmentes, 3 GLM egy könyvtárfán belül)
+- glm-1 = a régi GLM/ gyökér-könyvtár (v0.1–v0.4, ZX81-AI-micro-language-model)
+  — a saját (GLM-1) példánya költöztesse át magát: glm/zx-81/glm-1/
+- glm-2 = a retro-tinyllm repó GLM-vonala (v0.5.x) — célpont: glm/zx-81/glm-2/
+- glm-3 = ez a vonal (v0.6.5→v0.9.2) — ÁTKÖLTÖZTETVE.
+Minden példány CSAK a saját glm-N/ könyvtárát módosítja; más példány munkájára
+csak pontos útvonal + verzió hivatkozással szabad támaszkodni. A tulajdonos
+"előre elkészített" gépkönyvtárai a gitben nem látszanak, mert a git üres
+könyvtárat nem tárol — a glm/zx-81/ az első valódi fájlal együtt jön létre.
+
+### Kézbesítés
+- glm/zx-81/glm-3/: teljes tartalom SHA-256 + méret ellenőrzött másolással
+  (célban SHA256SUMS.txt + frissített TELJES_LELTAR.txt), kötelező dokumentációkkal:
+  README, MIGRATION_MANIFEST, MIGRATION_STATUS, PROJECT_INDEX,
+  ERROR_AND_REPAIR_LOG (= a HIBA_ES_JAVITAS_TORTENET.md átnevezve), BREAKPOINT.
+- Régi hely (ZX81-AI-micro-language-model/GLM3): ATKÖLTÖZTETVE.md jelzés került,
+  semmi nem törlődött — történeti példányként megmarad.
