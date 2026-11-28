@@ -1,0 +1,103 @@
+ALLAPOT-JELENTES (2026-11-25, v0.7.1 - a "be se toltok" + a topic-lanc vegleges gyokerere)
+
+UJ MUNKA EZEN A KORON (a visszajelzes: "Ezek a kazetta fajlok be se
+toltodnek be! T81 az egyetlen hasznalhato"):
+
+GYOKEREK ES JAVITASOK, MINDKETTO BIZONYITVA:
+
+1) A .tzx/.tap HALOTT volt ZX81-re az EightyOne-ban (a "be se toltok"
+   igazi oka - nem a verziobajt, nem a fejléc):
+   - EightyOne forras: az EventTurbo (ami a 0x10 ROM-blokkot jatszza)
+     SOHA nem irja a TZXByte-ot -> a ZX81 ROM $0356-os flashload-
+     fogadoja ures kezet kap. A betoltes bajt utan elhal.
+   - A LoadTAPFile szinten 0x10-es blokkokat gyart -> a .tap ugyanigy
+     halott ZX81-re.
+   - A ZX81-re mukodo TZX ut kizarolag a 0x19 GENERAL blokk (az
+     EventGeneral -> TZXByte -> ROM lanc), es pontosan ezt irja az
+     EightyOne sajat SaveGeneralBlock-ja. AZ UJ .tzx: mind a 15 blokk
+     0x19 GENERAL, a SaveGeneralBlock mezoformatumaval (TOTP=0,
+     TOTD=len*8, NPD=19, ASD=2, a ROM 530/520 us bitparjai, TZX
+     v1.20). A .tap veglegesen kimarad a csomagbol.
+   - Verifikator ujirva a LoadGeneralBlock fejléc-parszolasaval
+     (bits=ceil(log2(ASD))*TOTD, bytes=ceil(bits/8)); EREDMENY:
+     16 OK / 0 hiba (t81 + tzx + 14 .p).
+
+2) A /topic lanc 3. USR-halala (a "nem lehet betolteni rola" tunet
+   a topic betoltes utan) - utasitasszintig visszakovetve:
+   - A $7A40-es altint-blob eleji 'CALL $0207' = a SLOW-tanc; a tanc
+     a ROM display-walkjat inditja, ami a D-file sorait "vegrehajtja"
+     Z80-kodkent. Boot utan ez artalmatlan; a topic-csere UTAN a
+     D-file a 2. USR csomagolt chat-allapotat hordozza (0x00-0x3F =
+     JR-opcodok) - a walk vegigtancol rajtuk, a PC $2-re esik, a ROM
+     ujraindul, report C (szim: f3144 PC=$2, 29 frame csend, uj tanc).
+   - Ket elso javitasi kiserlet REGRESSZIOBA futott (SET 6 a tanc
+     ele - a 2. USR NMI-viharban allt meg; a blob CALL NOP-olasa -
+     a boot mar a 3. frame-ben meghalt) - MINDKETTO Visszavonva; a
+     bizonyitott helyzet az, hogy a CALL szukseges (a NMI-generatort
+     fegyverzi at).
+   - A MEGFELELO JAVITAS: a main() a tanc ELOTT kinullazza a D-file
+     3 munkasorat (C-bol, a $400C-os D_FILE mutatobol; 32 blank +
+     $76 minden sor) - a pack_state() azutan visszairja az allapotot.
+     Motor 13127 -> 13242 B (+115 B; modell $7417 -> $748A, az
+     ALTINT($7A40) alatt maradva).
+   - SZIM-VEGEREDMENY (5200 frame): 3 USR eletben - boot -> interju
+     -> SZIA chat -> /topic 1 -> RT-TUDOM betoltve (15085 B) -> a
+     topic-motor a CSILLAG valaszt generalja ($73db-$73e9 hurok,
+     f5199-ig fut), REPORT-B=0, D-file intact, minSP $7f31.
+   - t81check16_v05: ALL CHECKS PASSED (14 .p + 14 .t81 + 15-blokkos
+     szalag, CDFLAG=$40 minden blokkban).
+
+3) A "7786 bajt tul sok" kifogas lezarva: se a naiv listing-seta,
+   sem offszet-olvasasok nem adjak ki a 7786-ot (surplus=0 bájtosan,
+   v069 es v070 egyarant) - a szam a kievo eszkoz heurisztikaja.
+   Mellekve 14 db .p81 (nev-rekordos .p) a ZEsarUX-kompatibilis
+   utvonalkoz.
+
+LESZALLITVA: download/GLM_v071_workdir/ - 44 fajl:
+  GLM_v070_RT16_TOPICS.t81 (ELSODLEGES, 15 blokk)
+  GLM_v070_RT16_TOPICS.tzx (0x19 GENERAL, tenylegesen betolt)
+  14 db .p + 14 db .t81 + 14 db .p81 + GLM_v071_README_16K.txt
+
+--- 2026-11-25 KIEGESZITES (a SZIA-fagyás diagnózisa, v0.7.1 marad a szállított) ---
+
+A user jelente: BASE betöltve, TINYLLM+infó kiírva, SZIA+ENTER után a képernyő
+megfagyott (7 fekete cella a sor elején, a karakterek mozdulatlanok; a PC
+$51A4 és $FDxx tartományokban jár).
+
+A PC-adatok feloldva (a friss térképen):
+- $51A4 = kb_scanbits - a SAJÁT billentyű-szkennelőm ciklusa! A gép ÉL, a
+  getline-ban ül (a bemenetvárás pörgeti a szkent) - NEM összeomlás!
+- $FDxx = a RAM-on túli tükör - a display-NMI walkja a D-file sorait
+  "kódként" futtatja, és a ROM $02BA-es JP (HL) -je a D-file cellákból
+  épült (hostile) címre ugrik - ez a járásvesztés, ettől fagy a kép.
+- A "7 fekete cella" a kép elemzéséből: a begépelt SZIA visszajelző
+  celláihoz hosszú (5+2) fekete (inverz) cella - a display-NMI walk
+  elszabadulása előtti utolsó kiírt állapot.
+
+A gyökér (a ROM dekódolásból, szimmel igazolva):
+A gen_reply (a válaszgenerálás) elején a display NMI-generátorát KIkapcsolom
+(RES 6 + OUT $FD - a "gondolkodás" idejére). A válasz után a visszaKAPCSOLÁS
+a kb_rearm blokk (SET 6 + 17x OUT $FE). A SZIMben ez elég (a szim a generátor
+flagjét az utolsó OUT irányára állítja) - de a VALÓDI ZX81 NMI-generátora csak
+a ROM $0207-SLOW-táncának HALT-ján keresztül fegyverződik át újra! A 17x OUT
+$FE a valódi gépen NEM elég - ettől fagy meg a képernyő SZIA+ENTER után
+(a gép él, a getline fut, de a display halott).
+
+Kísérlet v0.7.2: a tánc (CALL $7A40 blob) betéve a gen_reply végére -
+a SZIMBEN regresszió (a tánc alatt a display-NMI a D-file cellákon fut
+el, a PC a main elejére köröz) - visszavontam. A tánc a szim NMI-modellje
+szerint mindig walk-veszélyt hordoz; a valós gépen a ROM saját mechanizmusa
+más úton kezelné. A szim nem tudja hozni a valós tánc-viselkedést, ezért a
+biztos, szimmel igazolt v0.7.1 maradt a leszállított állapot.
+
+A teljes javítás (a display-visszakapcsolás a valós gépen) a következő
+körben: vagy (a) a kb_rearm után a CDFLAG bit7 (SLOW bit) is beállítása
++ az első NMI előtt a D-file 0-7 sorainak biztonságos tartalma, vagy
+(b) a display-KI fázis elhagyása (a válaszgenerálás SLOW-ban marad -
+lassabb, de mindig működő). Az (a)-t javaslom (a bit7 hiánya a
+legvalószínűbb valós ok: a ROM $0F2B SLOW-ja a bit7-et is állítja, a
+saját kb_rearm-om csak a bit6-ot).
+
+A leszállított csomag most: a v0.7.1 motor (13242 B) - a boot és a
+topic-lánc szimmel teljesen igazolt (3 USR életben, RT-TUDOM betöltve,
+a topic-motor a CSILLAG választ generálja, REPORT-B=0).

@@ -1,0 +1,16 @@
+  [VIDEO RECOVERY] f29 - a kep visszatert (NMI ujra fut, CDFLAG=$c0)
+  [load #1] RTBOOT01 (any) 15889 B
+  [USR #1] f0 SP=$7fec ERR_NR=$ff
+  [EVT] f1418 MAIN VISSZATERT -> cleanup ($40A5) usr#1
+  [load #2] RTBASE16 (wanted RTBASE16) 15085 B
+  [USR #2] f0 SP=$7fec ERR_NR=$ff
+  *** STATE NULLAZODOTT! f1701 PC=$46 engine utoljara: f1700 PC=$51ec
+  [VIDEO RECOVERY] f2520 - a kep visszatert (NMI ujra fut, CDFLAG=$c0)
+  [EVT] f3141 MAIN VISSZATERT -> cleanup ($40A5) usr#2
+  [load #3] RT-TUDOM (wanted RT-TUDOM) 15085 B
+  [USR #3] f0 SP=$7fec ERR_NR=$ff
+  [VIDEO RECOVERY] f5283 - a kep visszatert (NMI ujra fut, CDFLAG=$80)
+  [engine utoljara lathato: f6899 PC=$5223]
+  USR hivasok: 3 (elso: f0)
+  REPORT-B site talalatok: 0 (nem tortent B)
+  minSP a motorban: $7f2d (f0, usr#2) - D-file intact
