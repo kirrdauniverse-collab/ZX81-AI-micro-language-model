@@ -1,0 +1,65 @@
+name: GLM2 one-shot import
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: glm2-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.event.issue != null && startsWith(github.event.comment.body, '/import-glm2 ') && github.event.comment.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v4
+
+      - name: Parse trigger comment
+        id: trig
+        env:
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          FIRST=$(printf '%s\n' "$BODY" | head -n 1)
+          URL=$(printf '%s\n' "$FIRST" | awk '{print $2}')
+          SHA=$(printf '%s\n' "$FIRST" | awk '{print $3}')
+          test -n "$URL" && test -n "$SHA"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Download delta tarball
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 240 --request POST --output /tmp/glm2_delta_v2.tar.gz "${{ steps.trig.outputs.url }}"
+
+      - name: Verify checksum
+        run: |
+          set -euo pipefail
+          printf '%s  /tmp/glm2_delta_v2.tar.gz\n' "${{ steps.trig.outputs.sha }}" | sha256sum --check --strict -
+
+      - name: Extract, commit and push GLM2 content
+        run: |
+          set -euo pipefail
+          tar -xzf /tmp/glm2_delta_v2.tar.gz -C .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to import."
+          else
+            git commit -m "GLM2: byte-exact consolidation of the handed-over v0.5.5->v0.7.3 line + forensic archive (parallel to the active GLM3 line)" -m "Imported via one-shot owner-triggered workflow from a checksum-verified tarball (GLM2/ tree, 78 files)."
+            git push origin HEAD:main
+          fi
+
+      - name: Self-remove workflow
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          git rm -f .github/workflows/import-glm2.yml || true
+          git commit -m "ci: remove GLM2 one-shot import workflow (done)" || echo "nothing to commit"
+          git push origin HEAD:main || echo "WARN: self-removal push failed; remove .github/workflows/import-glm2.yml manually"
